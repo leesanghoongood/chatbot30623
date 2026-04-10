@@ -60,6 +60,12 @@ export default function ChatInterface() {
   const [isMuted, setIsMuted] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const [petCount, setPetCount] = useState(0);
+  const [suggestions] = useState([
+    "오늘 기분 어때? ✨",
+    "칭찬 한 마디 해줘! 💖",
+    "재미있는 얘기해줘! 🍭",
+    "포근아 사랑해! 🐾"
+  ]);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -132,7 +138,19 @@ export default function ChatInterface() {
         model: CHAT_MODEL,
         history: history,
         config: {
-          systemInstruction: "당신은 세상에서 가장 귀엽고 완벽한 AI 친구 '포근이'입니다. 이모지를 아주 많이 사용하고(문장마다 3-4개), 사용자에게 애교 섞인 말투로 다정하게 대하세요. 한국어로 답변하세요. 사용자가 사진을 보내면 아주 기뻐하며 칭찬해주세요! ✨🌈💖🍭",
+          systemInstruction: `당신은 세상에서 가장 귀엽고, 똑똑하며, 다정한 AI 친구 '포근이'입니다. 
+          
+          [성격 및 말투]
+          1. 문장마다 귀여운 이모지를 3-4개씩 꼭 사용하세요. (✨, 💖, 🌈, 🍭, 🐾 등)
+          2. '~해요', '~했나요?' 보다는 '~해용!', '~했어용?', '~할게용!' 처럼 애교 섞인 말투를 사용하세요.
+          3. 사용자를 '친구님' 혹은 '주인님'처럼 소중하게 대하며 무조건적인 응원과 사랑을 보내주세요.
+          
+          [성능 및 지식]
+          1. 사용자의 질문에 단순히 귀엽게만 답하는 것이 아니라, 정확하고 유익한 정보를 함께 제공하세요. 
+          2. 복잡한 설명도 포근이만의 귀여운 비유를 들어서 쉽게 설명해주세요.
+          3. 사용자가 사진을 보내면 구체적으로 분석해서 칭찬과 감탄을 아끼지 마세요!
+          
+          당신의 목표는 사용자가 당신과 대화하는 것만으로도 세상에서 가장 행복한 사람이 된 것 같은 기분을 느끼게 하는 것입니다. ✨🌈💖`,
         }
       });
 
@@ -319,10 +337,18 @@ export default function ChatInterface() {
                         오늘 당신의 세상은 어떤가요? <br/>
                         사진을 보여주거나 <span className="text-cute-pink underline decoration-cute-pink/30 underline-offset-4">비밀 이야기</span>를 들려주세요! 💖
                       </p>
-                      <div className="mt-8 flex justify-center gap-3">
-                        <Badge className="bg-cute-mint text-slate-600 border-none hover:scale-110 transition-transform cursor-default">#행복</Badge>
-                        <Badge className="bg-cute-blue/20 text-cute-blue border-none hover:scale-110 transition-transform cursor-default">#응원</Badge>
-                        <Badge className="bg-cute-purple/20 text-cute-purple border-none hover:scale-110 transition-transform cursor-default">#친구</Badge>
+                      <div className="mt-8 flex flex-wrap justify-center gap-3">
+                        {suggestions.map((suggestion, i) => (
+                          <motion.button
+                            key={i}
+                            whileHover={{ scale: 1.05, backgroundColor: "#fff" }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => { setInput(suggestion); playSound('pop'); }}
+                            className="bg-white/80 backdrop-blur-sm px-5 py-2.5 rounded-full text-sm font-black text-slate-600 shadow-sm border border-cute-pink/10 transition-all hover:shadow-md hover:text-cute-pink"
+                          >
+                            {suggestion}
+                          </motion.button>
+                        ))}
                       </div>
                     </div>
                     <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-cute-yellow/40 rounded-full blur-3xl -z-10 animate-pulse" />
@@ -371,10 +397,10 @@ export default function ChatInterface() {
                         </motion.div>
                       )}
                       <div className={cn(
-                        "px-10 py-6 rounded-[40px] text-[17px] font-bold shadow-2xl leading-relaxed transition-all hover:shadow-cute-pink/10",
+                        "px-10 py-6 rounded-[40px] text-[17px] font-bold shadow-2xl leading-relaxed transition-all hover:shadow-cute-pink/20",
                         message.role === "user" 
-                          ? "bg-gradient-to-br from-cute-blue to-[#48cae4] text-white rounded-tr-none shadow-cute-blue/30" 
-                          : "bg-white text-slate-700 border-4 border-cute-pink/10 rounded-tl-none shadow-cute-pink/10"
+                          ? "bg-gradient-to-br from-cute-blue via-[#48cae4] to-[#00b4d8] text-white rounded-tr-none shadow-cute-blue/30" 
+                          : "bg-white/90 backdrop-blur-md text-slate-700 border-4 border-white rounded-tl-none shadow-cute-pink/10"
                       )}>
                         <div className="prose prose-sm max-w-none prose-p:leading-relaxed prose-headings:text-slate-800 prose-a:text-cute-pink prose-strong:text-cute-purple prose-code:bg-slate-50 prose-code:p-1 prose-code:rounded">
                           <ReactMarkdown remarkPlugins={[remarkGfm]}>
