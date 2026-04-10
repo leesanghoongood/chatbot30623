@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Sparkles, User, Loader2, Trash2, Heart, Smile, Star, Cat, Coffee } from "lucide-react";
+import { Send, Sparkles, User, Loader2, Trash2, Heart, Smile, Star, Cat, Coffee, Image as ImageIcon, X, Music, Volume2, VolumeX } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { motion, AnimatePresence } from "motion/react";
+import confetti from "canvas-confetti";
 import { ai, CHAT_MODEL, Message } from "@/src/lib/gemini";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,8 +35,13 @@ export default function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [mood, setMood] = useState<"happy" | "sleepy" | "energetic">("happy");
+  const [mood, setMood] = useState<"happy" | "sleepy" | "energetic" | "thinking">("happy");
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -43,24 +49,48 @@ export default function ChatInterface() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isLoading]);
+  }, [messages, isLoading, streamingText]);
+
+  const playSound = (type: 'send' | 'receive' | 'pop') => {
+    if (isMuted) return;
+    const sounds = {
+      send: 'https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3',
+      receive: 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3',
+      pop: 'https://assets.mixkit.co/active_storage/sfx/2361/2361-preview.mp3'
+    };
+    const audio = new Audio(sounds[type]);
+    audio.volume = 0.2;
+    audio.play().catch(() => {});
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSelectedImage(reader.result as string);
+        playSound('pop');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+    if ((!input.trim() && !selectedImage) || isLoading) return;
 
     const userMessage: Message = {
       role: "user",
       content: input,
       timestamp: Date.now(),
+      image: selectedImage || undefined
     };
 
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
+    setSelectedImage(null);
     setIsLoading(true);
-
-    // Randomly change mood for cuteness
-    const moods: ("happy" | "sleepy" | "energetic")[] = ["happy", "sleepy", "energetic"];
-    setMood(moods[Math.floor(Math.random() * moods.length)]);
+    setMood("thinking");
+    playSound('send');
 
     try {
       const history = messages.map((m) => ({
@@ -72,21 +102,52 @@ export default function ChatInterface() {
         model: CHAT_MODEL,
         history: history,
         config: {
-          systemInstruction: "당신은 세상에서 가장 귀엽고 친절한 AI 친구입니다. 이모지를 많이 사용하고, 사용자에게 다정하게 대하세요. 한국어로 답변하세요.",
+          systemInstruction: "당신은 세상에서 가장 귀엽고 완벽한 AI 친구 '포근이'입니다. 이모지를 아주 많이 사용하고, 사용자에게 애교 섞인 말투로 다정하게 대하세요. 한국어로 답변하세요. 사용자가 사진을 보내면 아주 기뻐하며 칭찬해주세요!",
         }
       });
 
-      const result = await chat.sendMessage({
-        message: input,
+      let promptParts: any[] = [{ text: input || "이 사진에 대해 알려줘!" }];
+      if (userMessage.image) {
+        promptParts.push({
+          inlineData: {
+            data: userMessage.image.split(',')[1],
+            mimeType: "image/jpeg"
+          }
+        });
+      }
+
+      const result = await chat.sendMessageStream({
+        message: promptParts,
       });
+
+      let fullText = "";
+      setStreamingText("");
+
+      for await (const chunk of result) {
+        const text = chunk.text;
+        fullText += text;
+        setStreamingText(fullText);
+      }
 
       const modelResponse: Message = {
         role: "model",
-        content: result.text || "우와! 대답을 생각하다가 깜빡했어요. 다시 물어봐 줄래요? ✨",
+        content: fullText || "우와! 대답을 생각하다가 깜빡했어요. 다시 물어봐 줄래요? ✨",
         timestamp: Date.now(),
       };
 
       setMessages((prev) => [...prev, modelResponse]);
+      setStreamingText("");
+      setMood("happy");
+      playSound('receive');
+      
+      // Celebrate with confetti!
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#ff85a1', '#7bdff2', '#b79ced', '#fcf6bd']
+      });
+
     } catch (error) {
       console.error("Gemini API Error:", error);
       const errorMessage: Message = {
@@ -95,112 +156,116 @@ export default function ChatInterface() {
         timestamp: Date.now(),
       };
       setMessages((prev) => [...prev, errorMessage]);
+      setMood("sleepy");
     } finally {
       setIsLoading(false);
-      setMood("happy");
     }
   };
 
   const getMoodIcon = () => {
     switch(mood) {
       case "sleepy": return <Coffee className="text-amber-400" size={14} />;
+      case "thinking": return <Loader2 className="text-cute-blue animate-spin" size={14} />;
       case "energetic": return <Star className="text-yellow-400 animate-spin-slow" size={14} />;
       default: return <Smile className="text-green-400" size={14} />;
     }
   };
 
-  const getMoodText = () => {
-    switch(mood) {
-      case "sleepy": return "졸려요..";
-      case "energetic": return "신나요!";
-      default: return "행복함";
-    }
-  };
-
   return (
-    <div className="flex items-center justify-center min-h-screen bg-[#fff9fb] p-4 relative overflow-hidden font-sans">
-      {/* Decorative Background Elements */}
-      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-cute-pink/10 rounded-full blur-[120px] animate-pulse" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-cute-blue/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '2s' }} />
+    <div className="flex items-center justify-center min-h-screen bg-[#fff9fb] p-4 relative overflow-hidden font-sans custom-scrollbar">
+      {/* Magical Background */}
+      <div className="absolute top-[-15%] left-[-15%] w-[60%] h-[60%] bg-cute-pink/15 rounded-full blur-[150px] animate-pulse" />
+      <div className="absolute bottom-[-15%] right-[-15%] w-[60%] h-[60%] bg-cute-blue/15 rounded-full blur-[150px] animate-pulse" style={{ animationDelay: '2s' }} />
+      <div className="absolute top-[30%] left-[40%] w-[20%] h-[20%] bg-cute-yellow/10 rounded-full blur-[100px]" />
       
       {/* Floating Particles */}
-      <FloatingParticle delay={0} color="bg-cute-pink/30" />
-      <FloatingParticle delay={2} color="bg-cute-blue/30" />
-      <FloatingParticle delay={5} color="bg-cute-purple/30" />
-      <FloatingParticle delay={7} color="bg-cute-yellow/30" />
+      {[...Array(10)].map((_, i) => (
+        <FloatingParticle key={i} delay={i * 1.5} color={["bg-cute-pink", "bg-cute-blue", "bg-cute-purple", "bg-cute-yellow"][i % 4] + "/30"} />
+      ))}
 
-      <Card className="w-full max-w-2xl h-[92vh] flex flex-col shadow-[0_30px_100px_rgba(255,133,161,0.2)] border-[6px] border-white rounded-[50px] overflow-hidden bg-white/60 backdrop-blur-xl z-10 relative">
-        <CardHeader className="flex flex-row items-center justify-between border-b-4 border-slate-50 bg-white/40 px-10 py-8">
-          <div className="flex items-center gap-5">
+      <Card className="w-full max-w-3xl h-[94vh] flex flex-col shadow-[0_40px_120px_rgba(255,133,161,0.25)] border-[8px] border-white rounded-[60px] overflow-hidden bg-white/40 backdrop-blur-2xl z-10 relative">
+        <CardHeader className="flex flex-row items-center justify-between border-b-4 border-slate-50/50 bg-white/30 px-12 py-10">
+          <div className="flex items-center gap-6">
             <motion.div 
-              animate={{ 
-                rotate: mood === "energetic" ? [0, 10, -10, 0] : 0,
-                scale: mood === "energetic" ? [1, 1.1, 1] : 1
+              whileHover={{ scale: 1.1, rotate: [0, 10, -10, 0] }}
+              className="bg-gradient-to-br from-cute-pink via-cute-purple to-cute-blue p-5 rounded-[30px] text-white shadow-2xl shadow-cute-pink/40 relative cursor-pointer group"
+              onClick={() => {
+                confetti({ particleCount: 50, spread: 50, origin: { x: 0.2, y: 0.2 } });
+                playSound('pop');
               }}
-              transition={{ repeat: mood === "energetic" ? Infinity : 0, duration: 0.5 }}
-              className="bg-gradient-to-br from-cute-pink via-cute-purple to-cute-blue p-4 rounded-[24px] text-white shadow-xl shadow-cute-pink/40 relative"
             >
-              <Cat size={28} />
+              <Cat size={32} className="group-hover:animate-wiggle" />
               <motion.div 
-                animate={{ scale: [1, 1.2, 1] }}
-                transition={{ repeat: Infinity, duration: 2 }}
-                className="absolute -top-1 -right-1 bg-white rounded-full p-1 shadow-sm"
+                animate={{ scale: [1, 1.3, 1] }}
+                transition={{ repeat: Infinity, duration: 1.5 }}
+                className="absolute -top-2 -right-2 bg-white rounded-full p-1.5 shadow-md"
               >
-                <Heart size={12} className="fill-cute-pink text-cute-pink" />
+                <Heart size={14} className="fill-cute-pink text-cute-pink" />
               </motion.div>
             </motion.div>
             <div>
-              <CardTitle className="text-2xl font-black tracking-tight text-slate-800 flex items-center gap-2">
-                포근한 미니 <Sparkles className="text-cute-yellow fill-cute-yellow" size={20} />
+              <CardTitle className="text-3xl font-black tracking-tight text-slate-800 flex items-center gap-3 font-cute">
+                포근이의 마법 대화 <Sparkles className="text-cute-yellow fill-cute-yellow animate-pulse" size={24} />
               </CardTitle>
-              <div className="flex items-center gap-3 mt-1.5">
-                <Badge variant="outline" className="text-[10px] font-black uppercase tracking-[0.2em] border-cute-pink/40 text-cute-pink bg-cute-pink/5 px-2 py-0.5 rounded-full">
-                  Gemini AI
+              <div className="flex items-center gap-4 mt-2">
+                <Badge variant="outline" className="text-[11px] font-black uppercase tracking-[0.3em] border-cute-pink/50 text-cute-pink bg-white/80 px-3 py-1 rounded-full shadow-sm">
+                  Perfect Gemini
                 </Badge>
-                <div className="flex items-center gap-1.5 bg-white/50 px-2 py-0.5 rounded-full border border-slate-100">
+                <div className="flex items-center gap-2 bg-white/80 px-3 py-1 rounded-full border border-slate-100 shadow-sm">
                   {getMoodIcon()}
-                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{getMoodText()}</span>
+                  <span className="text-[11px] text-slate-500 font-black uppercase tracking-widest">
+                    {mood === "thinking" ? "고민 중..." : mood === "sleepy" ? "졸려요.." : "기분 최고!"}
+                  </span>
                 </div>
               </div>
             </div>
           </div>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => setMessages([])} 
-            className="rounded-full h-12 w-12 text-slate-200 hover:text-cute-pink hover:bg-cute-pink/10 transition-all active:scale-90"
-          >
-            <Trash2 size={22} />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setIsMuted(!isMuted)} 
+              className="rounded-full h-12 w-12 text-slate-300 hover:text-cute-blue hover:bg-cute-blue/10 transition-all"
+            >
+              {isMuted ? <VolumeX size={22} /> : <Volume2 size={22} />}
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setMessages([])} 
+              className="rounded-full h-12 w-12 text-slate-200 hover:text-cute-pink hover:bg-cute-pink/10 transition-all active:scale-90"
+            >
+              <Trash2 size={22} />
+            </Button>
+          </div>
         </CardHeader>
 
         <CardContent className="flex-1 overflow-hidden p-0 relative">
-          <ScrollArea className="h-full px-10 py-12">
-            <div className="space-y-12">
+          <ScrollArea className="h-full px-12 py-14 custom-scrollbar">
+            <div className="space-y-14">
               {messages.length === 0 && (
-                <div className="flex flex-col items-center justify-center h-[55vh] text-center space-y-8">
+                <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-10">
                   <motion.div 
-                    initial={{ y: 30, opacity: 0, scale: 0.8 }}
+                    initial={{ y: 50, opacity: 0, scale: 0.5 }}
                     animate={{ y: 0, opacity: 1, scale: 1 }}
-                    transition={{ type: "spring", damping: 15 }}
+                    transition={{ type: "spring", damping: 12, stiffness: 100 }}
                     className="relative"
                   >
-                    <div className="bg-white p-10 rounded-[50px] shadow-2xl border-8 border-cute-pink/5 relative z-10">
+                    <div className="bg-white/90 p-12 rounded-[60px] shadow-[0_30px_60px_rgba(0,0,0,0.05)] border-8 border-white relative z-10 backdrop-blur-sm">
                       <motion.div
-                        animate={{ y: [0, -10, 0] }}
-                        transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+                        animate={{ y: [0, -15, 0], rotate: [0, 5, -5, 0] }}
+                        transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
                       >
-                        <Smile size={80} className="text-cute-pink mb-6 mx-auto drop-shadow-lg" />
+                        <Smile size={100} className="text-cute-pink mb-8 mx-auto drop-shadow-2xl" />
                       </motion.div>
-                      <h3 className="text-2xl font-black text-slate-800 mb-3">안녕! 기다렸어요! ✨</h3>
-                      <p className="text-slate-400 max-w-[280px] mx-auto text-base font-semibold leading-relaxed">
-                        오늘 당신의 하루는 어떤 색이었나요? <br/>
-                        <span className="text-cute-pink">반짝이는 이야기</span>를 들려주세요!
+                      <h3 className="text-3xl font-black text-slate-800 mb-4 font-cute">안녕! 포근이가 왔어요! ✨</h3>
+                      <p className="text-slate-400 max-w-[320px] mx-auto text-lg font-bold leading-relaxed">
+                        오늘 당신의 세상은 어떤가요? <br/>
+                        사진을 보여주거나 <span className="text-cute-pink underline decoration-cute-pink/30 underline-offset-4">비밀 이야기</span>를 들려주세요!
                       </p>
                     </div>
-                    {/* Decorative blobs */}
-                    <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-cute-yellow/30 rounded-full blur-2xl -z-10 animate-pulse" />
-                    <div className="absolute -top-8 -left-8 w-28 h-28 bg-cute-blue/30 rounded-full blur-2xl -z-10 animate-pulse" style={{ animationDelay: '1s' }} />
+                    <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-cute-yellow/40 rounded-full blur-3xl -z-10 animate-pulse" />
+                    <div className="absolute -top-10 -left-10 w-36 h-36 bg-cute-blue/40 rounded-full blur-3xl -z-10 animate-pulse" style={{ animationDelay: '1.5s' }} />
                   </motion.div>
                 </div>
               )}
@@ -209,81 +274,113 @@ export default function ChatInterface() {
                 {messages.map((message, index) => (
                   <motion.div
                     key={message.timestamp + index}
-                    initial={{ opacity: 0, y: 30, scale: 0.8, rotate: message.role === "user" ? 2 : -2 }}
+                    initial={{ opacity: 0, y: 40, scale: 0.7, rotate: message.role === "user" ? 3 : -3 }}
                     animate={{ opacity: 1, y: 0, scale: 1, rotate: 0 }}
                     className={cn(
-                      "flex gap-5 w-full",
+                      "flex gap-6 w-full",
                       message.role === "user" ? "flex-row-reverse" : "flex-row"
                     )}
                   >
                     <Avatar className={cn(
-                      "h-12 w-12 border-[4px] shadow-lg shrink-0",
-                      message.role === "user" ? "border-cute-blue/30" : "border-cute-pink/30"
+                      "h-14 w-14 border-[5px] shadow-xl shrink-0",
+                      message.role === "user" ? "border-cute-blue/40" : "border-cute-pink/40"
                     )}>
                       {message.role === "user" ? (
                         <div className="bg-cute-blue flex items-center justify-center w-full h-full text-white">
-                          <User size={24} />
+                          <User size={28} />
                         </div>
                       ) : (
                         <div className="bg-cute-pink flex items-center justify-center w-full h-full text-white">
-                          <Sparkles size={24} />
+                          <Sparkles size={28} />
                         </div>
                       )}
                     </Avatar>
                     
                     <div className={cn(
-                      "flex flex-col max-w-[85%] space-y-2.5",
+                      "flex flex-col max-w-[85%] space-y-3",
                       message.role === "user" ? "items-end" : "items-start"
                     )}>
+                      {message.image && (
+                        <motion.div 
+                          initial={{ scale: 0.8 }}
+                          animate={{ scale: 1 }}
+                          className="rounded-[30px] overflow-hidden border-4 border-white shadow-lg mb-2 max-w-[300px]"
+                        >
+                          <img src={message.image} alt="Uploaded" className="w-full h-auto" referrerPolicy="no-referrer" />
+                        </motion.div>
+                      )}
                       <div className={cn(
-                        "px-8 py-5 rounded-[35px] text-[16px] font-semibold shadow-xl leading-relaxed transition-all hover:scale-[1.02]",
+                        "px-10 py-6 rounded-[40px] text-[17px] font-bold shadow-2xl leading-relaxed transition-all hover:scale-[1.01] blob-shape",
                         message.role === "user" 
-                          ? "bg-gradient-to-br from-cute-blue to-[#5bc0de] text-white rounded-tr-none shadow-cute-blue/20" 
-                          : "bg-white text-slate-700 border-4 border-cute-pink/5 rounded-tl-none shadow-cute-pink/5"
+                          ? "bg-gradient-to-br from-cute-blue to-[#48cae4] text-white rounded-tr-none shadow-cute-blue/30" 
+                          : "bg-white text-slate-700 border-4 border-cute-pink/10 rounded-tl-none shadow-cute-pink/10"
                       )}>
-                        <div className="prose prose-sm max-w-none prose-p:leading-relaxed prose-headings:text-slate-800 prose-a:text-cute-pink prose-strong:text-cute-purple">
+                        <div className="prose prose-sm max-w-none prose-p:leading-relaxed prose-headings:text-slate-800 prose-a:text-cute-pink prose-strong:text-cute-purple prose-code:bg-slate-50 prose-code:p-1 prose-code:rounded">
                           <ReactMarkdown remarkPlugins={[remarkGfm]}>
                             {message.content}
                           </ReactMarkdown>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 px-3">
-                        <span className="text-[10px] text-slate-300 font-black uppercase tracking-[0.2em]">
+                      <div className="flex items-center gap-3 px-4">
+                        <span className="text-[11px] text-slate-300 font-black uppercase tracking-[0.3em]">
                           {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
-                        {message.role === "model" && <Heart size={10} className="text-cute-pink/40 fill-cute-pink/40" />}
+                        {message.role === "model" && <Heart size={12} className="text-cute-pink/50 fill-cute-pink/50 animate-pulse" />}
                       </div>
                     </div>
                   </motion.div>
                 ))}
+                
+                {streamingText && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex gap-6 w-full"
+                  >
+                    <Avatar className="h-14 w-14 border-[5px] border-cute-pink/40 shadow-xl shrink-0">
+                      <div className="bg-cute-pink flex items-center justify-center w-full h-full text-white">
+                        <Sparkles size={28} />
+                      </div>
+                    </Avatar>
+                    <div className="flex flex-col max-w-[85%] space-y-3 items-start">
+                      <div className="px-10 py-6 rounded-[40px] rounded-tl-none text-[17px] font-bold shadow-2xl leading-relaxed bg-white text-slate-700 border-4 border-cute-pink/10 blob-shape">
+                        <div className="prose prose-sm max-w-none">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {streamingText}
+                          </ReactMarkdown>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
               </AnimatePresence>
               
-              {isLoading && (
+              {isLoading && !streamingText && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="flex gap-5"
+                  className="flex gap-6"
                 >
-                  <Avatar className="h-12 w-12 border-[4px] border-cute-pink/30 shadow-lg">
+                  <Avatar className="h-14 w-14 border-[5px] border-cute-pink/40 shadow-xl">
                     <div className="bg-cute-pink flex items-center justify-center w-full h-full text-white">
-                      <Sparkles size={24} />
+                      <Sparkles size={28} />
                     </div>
                   </Avatar>
-                  <div className="bg-white border-4 border-cute-pink/5 px-8 py-5 rounded-[35px] rounded-tl-none shadow-xl flex items-center gap-4">
-                    <div className="flex gap-1.5">
+                  <div className="bg-white border-4 border-cute-pink/10 px-10 py-6 rounded-[40px] rounded-tl-none shadow-2xl flex items-center gap-5">
+                    <div className="flex gap-2">
                       {[0, 1, 2].map((i) => (
                         <motion.span 
                           key={i}
-                          animate={{ y: [0, -8, 0], scale: [1, 1.2, 1] }} 
-                          transition={{ repeat: Infinity, duration: 0.8, delay: i * 0.15 }}
+                          animate={{ y: [0, -12, 0], scale: [1, 1.4, 1] }} 
+                          transition={{ repeat: Infinity, duration: 0.7, delay: i * 0.15 }}
                           className={cn(
-                            "w-2.5 h-2.5 rounded-full shadow-sm",
+                            "w-3.5 h-3.5 rounded-full shadow-md",
                             i === 0 ? "bg-cute-pink" : i === 1 ? "bg-cute-purple" : "bg-cute-blue"
                           )} 
                         />
                       ))}
                     </div>
-                    <span className="text-sm text-slate-400 font-black tracking-widest uppercase">생각 중...</span>
+                    <span className="text-base text-slate-400 font-black tracking-[0.2em] uppercase font-cute">마법을 부리는 중...</span>
                   </div>
                 </motion.div>
               )}
@@ -292,30 +389,64 @@ export default function ChatInterface() {
           </ScrollArea>
         </CardContent>
 
-        <CardFooter className="p-10 bg-white/60 backdrop-blur-md border-t-4 border-slate-50">
+        <CardFooter className="p-12 bg-white/40 backdrop-blur-xl border-t-4 border-slate-50/50 flex flex-col gap-6">
+          {selectedImage && (
+            <motion.div 
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="relative self-start"
+            >
+              <img src={selectedImage} alt="Preview" className="h-24 w-24 object-cover rounded-[20px] border-4 border-white shadow-xl" referrerPolicy="no-referrer" />
+              <Button 
+                size="icon" 
+                variant="destructive" 
+                className="absolute -top-3 -right-3 h-8 w-8 rounded-full shadow-lg"
+                onClick={() => setSelectedImage(null)}
+              >
+                <X size={14} />
+              </Button>
+            </motion.div>
+          )}
+          
           <form
             onSubmit={(e) => {
               e.preventDefault();
               handleSend();
             }}
-            className="flex w-full items-center gap-5"
+            className="flex w-full items-center gap-6"
           >
             <div className="relative flex-1 group">
               <Input
-                placeholder="여기에 반짝이는 메시지를 적어주세요..."
+                placeholder="여기에 마법 같은 메시지를..."
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 disabled={isLoading}
-                className="pr-20 py-10 rounded-[40px] border-4 border-slate-100 focus:border-cute-pink/40 focus:ring-0 transition-all bg-white/80 shadow-[inset_0_2px_10px_rgba(0,0,0,0.02)] text-slate-700 font-bold text-lg placeholder:text-slate-300"
+                className="pr-32 py-12 rounded-[50px] border-4 border-slate-100 focus:border-cute-pink/50 focus:ring-0 transition-all bg-white/90 shadow-[inset_0_4px_15px_rgba(0,0,0,0.03)] text-slate-700 font-black text-xl placeholder:text-slate-200"
               />
-              <div className="absolute right-4 top-1/2 -translate-y-1/2">
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-3">
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  ref={fileInputRef} 
+                  onChange={handleImageUpload}
+                />
+                <Button 
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="h-12 w-12 rounded-full text-slate-300 hover:text-cute-blue hover:bg-cute-blue/10 transition-all"
+                >
+                  <ImageIcon size={24} />
+                </Button>
                 <Button 
                   type="submit" 
                   size="icon" 
-                  disabled={!input.trim() || isLoading}
-                  className="h-14 w-14 rounded-full bg-gradient-to-br from-cute-pink via-cute-purple to-cute-blue hover:scale-110 active:scale-90 shadow-2xl shadow-cute-pink/40 transition-all border-none group-focus-within:rotate-12"
+                  disabled={(!input.trim() && !selectedImage) || isLoading}
+                  className="h-16 w-16 rounded-full bg-gradient-to-br from-cute-pink via-cute-purple to-cute-blue hover:scale-110 active:scale-90 shadow-[0_10px_30px_rgba(255,133,161,0.4)] transition-all border-none group-focus-within:rotate-6"
                 >
-                  {isLoading ? <Loader2 className="animate-spin" size={24} /> : <Send size={24} />}
+                  {isLoading ? <Loader2 className="animate-spin" size={28} /> : <Send size={28} />}
                 </Button>
               </div>
             </div>
@@ -323,8 +454,8 @@ export default function ChatInterface() {
         </CardFooter>
       </Card>
       
-      <div className="fixed bottom-8 text-[12px] text-slate-300 font-black uppercase tracking-[0.4em] pointer-events-none opacity-40">
-        Created with Magic & Gemini AI
+      <div className="fixed bottom-10 text-[13px] text-slate-300 font-black uppercase tracking-[0.6em] pointer-events-none opacity-40 font-cute">
+        Magic Powered by Gemini AI
       </div>
     </div>
   );

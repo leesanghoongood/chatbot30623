@@ -14,4 +14,5 @@ export interface Message {
   role: "user" | "model";
   content: string;
   timestamp: number;
+  image?: string; // base64 image data
 }
