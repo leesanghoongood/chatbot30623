@@ -14,16 +14,17 @@
   
   --animate-float: float 6s ease-in-out infinite;
   --animate-wiggle: wiggle 1s ease-in-out infinite;
+  --animate-pulse-slow: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 @keyframes float {
   0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-20px); }
+  50% { transform: translateY(-10px); }
 }
 
 @keyframes wiggle {
-  0%, 100% { transform: rotate(-3deg); }
-  50% { transform: rotate(3deg); }
+  0%, 100% { transform: rotate(-2deg); }
+  50% { transform: rotate(2deg); }
 }
 
 .blob-shape {
@@ -45,6 +46,14 @@
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #ff85a188;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
 }
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
