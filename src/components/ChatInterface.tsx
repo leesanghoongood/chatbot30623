@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Sparkles, User, Loader2, Trash2, Heart, Smile, Star, Cat, Coffee, Image as ImageIcon, X, Music, Gift, Moon, Volume2, VolumeX, Copy, Wand2, Crown, UtensilsCrossed, Gamepad2, Book } from "lucide-react";
+import { Send, Sparkles, User, Loader2, Trash2, Heart, Smile, Star, Cat, Coffee, Image as ImageIcon, X, Music, Gift, Moon, Volume2, VolumeX, Copy, Wand2, Crown, UtensilsCrossed, Gamepad2, Book, Package, Home, Trophy, Camera, Gamepad, ShoppingCart, Medal, Check } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { motion, AnimatePresence } from "motion/react";
@@ -18,12 +18,12 @@ const SparkleTrail = () => {
   
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (Math.random() > 0.8) {
+      if (Math.random() > 0.9) { // Reduced frequency from 0.8
         const id = Date.now();
-        setTrails(prev => [...prev, { id, x: e.clientX, y: e.clientY }].slice(-15));
+        setTrails(prev => [...prev, { id, x: e.clientX, y: e.clientY }].slice(-10)); // Reduced count from 15
         setTimeout(() => {
           setTrails(prev => prev.filter(t => t.id !== id));
-        }, 1000);
+        }, 800); // Reduced duration from 1000
       }
     };
     window.addEventListener('mousemove', handleMouseMove);
@@ -64,12 +64,74 @@ export default function ChatInterface() {
   const [showNotification, setShowNotification] = useState<string | null>(null);
   const [catDialogue, setCatDialogue] = useState("");
   const [theme, setTheme] = useState<"pink" | "blue" | "mint" | "purple">("pink");
+  const [volume, setVolume] = useState(0.2);
   const [nickname, setNickname] = useState(localStorage.getItem("pogn_nickname") || "친구님");
   const [showSettings, setShowSettings] = useState(false);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const [showDiary, setShowDiary] = useState(false);
   const [showGame, setShowGame] = useState(false);
   const [showAlbum, setShowAlbum] = useState(false);
+  const [showRoom, setShowRoom] = useState(false);
+  const [weather, setWeather] = useState<"clear" | "rain" | "snow" | "petals">("clear");
+  const [magicDust, setMagicDust] = useState(Number(localStorage.getItem("pogn_dust")) || 0);
+  const [showShop, setShowShop] = useState(false);
+  const [roomItems, setRoomItems] = useState<string[]>(() => JSON.parse(localStorage.getItem("pogn_room_items") || "[]"));
+  const [dreamMode, setDreamMode] = useState(false);
+  const [wish, setWish] = useState<string | null>(null);
+  const [isPhotoMode, setIsPhotoMode] = useState(false);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (mood === 'happy' && !wish && Math.random() > 0.3) {
+        const possibleWishes = ['fish', 'milk', 'yarn', 'ribbon', 'catnip', 'heart_cookie'];
+        const w = possibleWishes[Math.floor(Math.random() * possibleWishes.length)];
+        setWish(w);
+        const itemNames: Record<string, string> = { 
+          fish: '연어', 
+          milk: '우유', 
+          yarn: '실뭉치', 
+          ribbon: '리본', 
+          catnip: '캣닢', 
+          heart_cookie: '하트 쿠키' 
+        };
+        setCatDialogue(`지금 딱 ${itemNames[w]}가 생각나용! 혹시... 줄 수 있나요? 🥺✨`);
+        setTimeout(() => {
+          setWish(null);
+          setCatDialogue("");
+        }, 60000); // Wish lasts 1 minute
+      }
+    }, 180000); // Every 3 minutes check
+    return () => clearInterval(interval);
+  }, [mood, wish]);
+
+  useEffect(() => {
+    localStorage.setItem("pogn_room_items", JSON.stringify(roomItems));
+  }, [roomItems]);
+
+  useEffect(() => {
+    localStorage.setItem("pogn_dust", magicDust.toString());
+  }, [magicDust]);
+
+  useEffect(() => {
+    // Random weather change every 10 minutes
+    const weathers: ("clear" | "rain" | "snow" | "petals")[] = ["clear", "clear", "rain", "snow", "petals"];
+    const interval = setInterval(() => {
+      setWeather(weathers[Math.floor(Math.random() * weathers.length)]);
+    }, 600000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const toggleRoom = () => {
+    setShowRoom(!showRoom);
+    playSound('pop');
+  };
+
+  const addItemToRoom = (itemId: string) => {
+    if (!roomItems.includes(itemId)) {
+      setRoomItems(prev => [...prev, itemId]);
+      setShowNotification("🏠 방에 아이템을 배치했어용! ✨");
+    }
+  };
   const [missions, setMissions] = useState<{ title: string; completed: boolean; icon: string }[]>(() => {
     const saved = localStorage.getItem("pogn_missions");
     const today = new Date().toDateString();
@@ -79,7 +141,10 @@ export default function ChatInterface() {
       return [
         { title: "포근이 5번 쓰다듬기", completed: false, icon: "🐾" },
         { title: "포근이에게 간식 주기", completed: false, icon: "🍖" },
-        { title: "오늘의 일기 쓰기", completed: false, icon: "📔" }
+        { title: "오늘의 일기 쓰기", completed: false, icon: "📔" },
+        { title: "하트 잡기 게임 하기", completed: false, icon: "🎮" },
+        { title: "마법 연금술 시도하기", completed: false, icon: "🧪" },
+        { title: "포근이랑 1분 동안 대화하기", completed: false, icon: "🗣️" }
       ];
     }
     return saved ? JSON.parse(saved) : [];
@@ -93,6 +158,44 @@ export default function ChatInterface() {
   useEffect(() => {
     if (petCount >= 5) updateMission("포근이 5번 쓰다듬기");
   }, [petCount]);
+
+  const [pognThought, setPognThought] = useState("");
+
+  useEffect(() => {
+    const thoughts = [
+      "졸려요.. 같이 낮잠 잘래용? 😴",
+      "오늘따라 기분이 넘 좋아용! ✨",
+      "연어.. 넘 먹고 싶어용.. 🐟",
+      "우리 평생 친구 하는 거예용! 💖",
+      "방이 넘 예뻐지는 것 같아용! 🏰",
+      "새로운 장난감이 필요해용.. 🐭",
+      "마법 가루가 반짝반짝! ✨",
+      "하늘에 있는 구름이 솜사탕 같아용! ☁️"
+    ];
+
+    const interval = setInterval(() => {
+      if (Math.random() > 0.7 && !catDialogue && !showAlchemy && !showGame) {
+        const thought = thoughts[Math.floor(Math.random() * thoughts.length)];
+        setPognThought(thought);
+        setTimeout(() => setPognThought(""), 4000);
+      }
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [catDialogue, showAlchemy, showGame]);
+
+  const [sessionStartTime] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const elapsed = (Date.now() - sessionStartTime) / 1000;
+      if (elapsed >= 60) {
+        updateMission("포근이랑 1분 동안 대화하기");
+        clearInterval(timer);
+      }
+    }, 5000);
+    return () => clearInterval(timer);
+  }, []);
 
   const updateMission = (title: string) => {
     setMissions(prev => prev.map(m => {
@@ -110,11 +213,121 @@ export default function ChatInterface() {
   const [diaries, setDiaries] = useState<{ id: string; date: string; content: string }[]>(() => {
     return JSON.parse(localStorage.getItem("pogn_diaries") || "[]");
   });
-  const [gameScore, setGameScore] = useState(0);
   const [achievements, setAchievements] = useState<string[]>(() => {
     return JSON.parse(localStorage.getItem("pogn_achievements") || "[]");
   });
-  const [volume, setVolume] = useState(0.1);
+  const [inventory, setInventory] = useState<{ id: string; name: string; icon: string; count: number }[]>(() => {
+    return JSON.parse(localStorage.getItem("pogn_inventory") || "[]");
+  });
+  const [lastRewardDate, setLastRewardDate] = useState(localStorage.getItem("pogn_last_reward") || "");
+  const [showInventory, setShowInventory] = useState(false);
+  const [showGiftBox, setShowGiftBox] = useState(false);
+  const [showAlchemy, setShowAlchemy] = useState(false);
+  const [alchemyIngredients, setAlchemyIngredients] = useState<string[]>([]);
+  const [gameScore, setGameScore] = useState(0); // This was redundant in some edits, keeping one
+  const [gameActive, setGameActive] = useState(false);
+  const [album, setAlbum] = useState<{ id: string; url: string; date: string; caption: string }[]>(() => {
+    return JSON.parse(localStorage.getItem("pogn_album") || "[]");
+  });
+  
+  useEffect(() => {
+    localStorage.setItem("pogn_album", JSON.stringify(album));
+  }, [album]);
+
+  useEffect(() => {
+    localStorage.setItem("pogn_inventory", JSON.stringify(inventory));
+  }, [inventory]);
+
+  const toggleAlchemy = () => {
+    setShowAlchemy(!showAlchemy);
+    setAlchemyIngredients([]);
+    playSound('pop');
+  };
+
+  const combineItems = () => {
+    if (alchemyIngredients.length !== 2) return;
+    
+    const [id1, id2] = alchemyIngredients;
+    // Consume items
+    setInventory(prev => prev.map(i => {
+      let deduct = 0;
+      if (i.id === id1) deduct++;
+      if (i.id === id2) deduct++;
+      return { ...i, count: i.count - deduct };
+    }).filter(i => i.count > 0));
+
+    playSound('magic');
+    fireConfetti();
+    updateMission("마법 연금술 시도하기");
+    
+    let result = { name: "반짝이는 마법 가루", icon: "✨", score: 2 };
+    if ((id1 === 'fish' && id2 === 'milk') || (id2 === 'fish' && id1 === 'milk')) {
+      result = { name: "맛있는 고양이 푸딩", icon: "🍮", score: 10 };
+    } else if ((id1 === 'yarn' && id2 === 'ribbon') || (id2 === 'yarn' && id1 === 'ribbon')) {
+      result = { name: "마법의 장난감", icon: "🪄", score: 8 };
+    } else if ((id1 === 'magic_stone' && id2 === 'potion') || (id2 === 'magic_stone' && id1 === 'potion')) {
+      result = { name: "비밀의 결정체", icon: "🔮", score: 25 };
+    } else if ((id1 === 'fish' && id2 === 'catnip') || (id2 === 'fish' && id1 === 'catnip')) {
+      result = { name: "황금 연어", icon: "🍱", score: 15 };
+    } else if ((id1 === 'potion' && id2 === 'catnip') || (id2 === 'potion' && id1 === 'catnip')) {
+      result = { name: "꿈의 숲 조각", icon: "🌿", score: 20 };
+    } else if ((id1 === 'ribbon' && id2 === 'magic_stone') || (id2 === 'ribbon' && id1 === 'magic_stone')) {
+      result = { name: "별빛 티아라", icon: "👑", score: 30 };
+    }
+
+    setFriendshipScore(s => {
+      const newScore = s + result.score;
+      // Level up check
+      if (Math.floor(newScore / 10) > Math.floor(s / 10)) {
+        setTimeout(() => {
+          fireConfetti();
+          playSound('magic');
+          setShowNotification(`✨ 축하해용! 우정 레벨이 ${Math.floor(newScore / 10)}으로 올랐어용! ✨`);
+          setMood('energetic');
+        }, 1000);
+      }
+      return newScore;
+    });
+    setMagicDust(d => d + (result.score * 2));
+    
+    // Check if result is a decoration
+    if (result.name === "마법의 장난감") {
+      addItemToRoom('toy');
+    } else if (result.name === "꿈의 숲 조각") {
+      addItemToRoom('forest');
+    } else if (result.name === "별빛 티아라") {
+      addItemToRoom('tiara');
+    }
+    
+    setShowNotification(`🧪 연금술 성공! [${result.icon} ${result.name}]를 만들었어용! ✨`);
+    setCatDialogue(`${result.name}!! 우와아 신기해용! 😻`);
+    setMood('energetic');
+    setShowAlchemy(false);
+    
+    setTimeout(() => setCatDialogue(""), 4000);
+  };
+
+  const startGame = () => {
+    setGameScore(0);
+    setGameActive(true);
+    setMood('energetic');
+    playSound('pop');
+    updateMission("하트 잡기 게임 하기");
+  };
+
+  const endEmojiGame = () => {
+    setGameActive(false);
+    setMood('happy');
+    const reward = Math.floor(gameScore / 5);
+    const dustReward = Math.floor(gameScore / 2);
+    if (reward > 0) {
+      setFriendshipScore(s => s + reward);
+      setMagicDust(d => d + dustReward);
+      setShowNotification(`🎮 게임 종료! 보너스 우정 점수 +${reward}점, 마법 가루 +${dustReward} 획득! ✨`);
+      fireConfetti();
+    }
+  };
+
   const [isBgmPlaying, setIsBgmPlaying] = useState(false);
   const bgmRef = useRef<HTMLAudioElement | null>(null);
 
@@ -169,12 +382,46 @@ export default function ChatInterface() {
     { level: 12, name: "포근이의 전부", icon: "💖" }
   ];
 
+  const [floatingIcons, setFloatingIcons] = useState<{ id: number; icon: string; x: number; y: number }[]>([]);
+
+  const triggerFloatingIcon = (icon: string) => {
+    const id = Date.now();
+    const x = Math.random() * 60 + 20; // 20% to 80%
+    const y = Math.random() * 40 + 30; // 30% to 70%
+    setFloatingIcons(prev => [...prev, { id, icon, x, y }]);
+    setTimeout(() => {
+      setFloatingIcons(prev => prev.filter(f => f.id !== id));
+    }, 2000);
+  };
+
+  const getCatIcon = (size: number) => {
+    if (friendshipLevel >= 10) return <Cat size={size} className="animate-pulse" />;
+    if (friendshipLevel >= 5) return <Cat size={size} />;
+    return <Cat size={size} />;
+  };
+
+  const getCatAura = () => {
+    if (friendshipLevel >= 10) return "shadow-[0_0_30px_rgba(251,191,36,0.5)]";
+    if (friendshipLevel >= 5) return "shadow-[0_0_20px_rgba(244,114,182,0.3)]";
+    return "shadow-lg";
+  };
+
   const currentLevelInfo = friendshipLevels[Math.min(Math.floor(friendshipScore / 10), friendshipLevels.length - 1)];
   const friendshipLevel = currentLevelInfo.level;
   const friendshipName = currentLevelInfo.name;
   const friendshipIcon = currentLevelInfo.icon;
   const friendshipProgress = Math.min((friendshipScore % 10) * 10, 100);
   
+  const [timeTheme, setTimeTheme] = useState("");
+
+  useEffect(() => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 11) setTimeTheme("bg-gradient-to-br from-orange-50/50 via-pink-50/50 to-blue-50/50"); // Morning
+    else if (hour >= 11 && hour < 17) setTimeTheme("bg-gradient-to-br from-blue-50/50 via-white to-sky-50/50"); // Day
+    else if (hour >= 17 && hour < 21) setTimeTheme("bg-gradient-to-br from-indigo-50/50 via-purple-50/50 to-pink-50/50"); // Evening
+    else setTimeTheme("bg-gradient-to-br from-slate-900/10 via-indigo-900/10 to-slate-900/10"); // Night
+  }, []);
+
   const themes = {
     pink: {
       primary: "from-cute-pink via-cute-purple to-cute-blue",
@@ -211,6 +458,24 @@ export default function ChatInterface() {
       button: "bg-cute-purple",
       msgUser: "bg-gradient-to-br from-cute-purple to-[#553c9a]",
       particle: "bg-cute-purple"
+    },
+    gold: {
+      primary: "from-yellow-400 via-amber-400 to-orange-400",
+      bg: "bg-[#fffdf5]",
+      border: "border-yellow-300",
+      text: "text-amber-600",
+      button: "bg-gradient-to-r from-yellow-500 to-amber-600",
+      msgUser: "bg-gradient-to-br from-yellow-550 to-orange-600",
+      particle: "bg-yellow-400"
+    },
+    dark: {
+      primary: "from-slate-700 via-slate-800 to-slate-900",
+      bg: "bg-slate-950",
+      border: "border-slate-800",
+      text: "text-slate-300",
+      button: "bg-slate-700",
+      msgUser: "bg-gradient-to-br from-slate-600 to-slate-800",
+      particle: "bg-slate-500"
     }
   };
 
@@ -267,12 +532,13 @@ export default function ChatInterface() {
     setIsBgmPlaying(!isBgmPlaying);
   };
 
-  const playSound = (type: 'send' | 'receive' | 'pop') => {
+  const playSound = (type: 'send' | 'receive' | 'pop' | 'magic') => {
     if (isMuted) return;
     const sounds = {
       send: 'https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3',
       receive: 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3',
-      pop: 'https://assets.mixkit.co/active_storage/sfx/2361/2361-preview.mp3'
+      pop: 'https://assets.mixkit.co/active_storage/sfx/2361/2361-preview.mp3',
+      magic: 'https://assets.mixkit.co/active_storage/sfx/2363/2363-preview.mp3'
     };
     const audio = new Audio(sounds[type]);
     audio.volume = volume;
@@ -302,12 +568,26 @@ export default function ChatInterface() {
     };
 
     setMessages((prev) => [...prev, userMessage]);
-    setFriendshipScore(prev => prev + 1);
+    setFriendshipScore(prev => prev + 0.1);
     setInput("");
     setSelectedImage(null);
     setIsLoading(true);
     setMood("thinking");
     playSound('send');
+
+    // Secret Command Check
+    const lowInput = input.toLowerCase();
+    if (lowInput.includes("불꽃놀이")) {
+      fireConfetti();
+      setShowNotification("✨ 펑펑! 아름다운 불꽃놀이에용! ✨");
+    }
+    if (lowInput.includes("사랑해")) {
+      setMood("energetic");
+      fireConfetti();
+    }
+    if (lowInput.includes("배고파")) {
+      setCatDialogue("포근이도 배고파용! 맛있는 거 주세용! 🐟");
+    }
 
     try {
       const history = messages.map((m) => ({
@@ -322,6 +602,9 @@ export default function ChatInterface() {
           
           현재 사용자의 닉네임은 '${nickname}'입니다.
           현재 우정 등급은 '${friendshipName}' (Level ${friendshipLevel})입니다.
+          현재 포근이의 방에는 [${roomItems.join(", ")}] 아이템들이 장식되어 있습니다.
+          현재 포근이의 기분은 '${mood}'입니다.
+          현재 날씨는 '${weather}'입니다.
           우정 등급이 높을수록 사용자를 더 친근하고 각별하게 대하세요.
           
           [성격 및 말투]
@@ -342,6 +625,7 @@ export default function ChatInterface() {
       let parts: any[] = [{ text: promptText }];
       
       if (userMessage.image) {
+        addToAlbum(userMessage.image, input || "포근이와 함께 본 사진 ✨");
         parts.push({
           inlineData: {
             data: userMessage.image.split(',')[1],
@@ -409,6 +693,139 @@ export default function ChatInterface() {
   }, [achievements]);
 
   useEffect(() => {
+    localStorage.setItem("pogn_inventory", JSON.stringify(inventory));
+  }, [inventory]);
+
+  const checkDailyReward = () => {
+    const today = new Date().toDateString();
+    if (lastRewardDate !== today) {
+      setShowGiftBox(true);
+    }
+  };
+
+  useEffect(() => {
+    checkDailyReward();
+  }, []);
+
+  const claimReward = () => {
+    const today = new Date().toDateString();
+    setLastRewardDate(today);
+    localStorage.setItem("pogn_last_reward", today);
+    setMagicDust(d => d + 20);
+    
+    const possibleItems = [
+      { id: 'fish', name: '맛있는 연어', icon: '🐟' },
+      { id: 'yarn', name: '마법 실뭉치', icon: '🧶' },
+      { id: 'ribbon', name: '핑크 리본', icon: '🎀' },
+      { id: 'milk', name: '신선한 우유', icon: '🥛' }
+    ];
+    
+    const randomItem = possibleItems[Math.floor(Math.random() * possibleItems.length)];
+    const dustBonus = Math.floor(Math.random() * 50) + 20;
+    setMagicDust(d => d + dustBonus);
+    addItemToInventory(randomItem);
+    setShowGiftBox(false);
+    setShowNotification(`🎁 보랏빛 상자에서 [${randomItem.icon} ${randomItem.name}]와 마법 가루 ${dustBonus}를 얻었어용! ✨`);
+    fireConfetti();
+  };
+
+  const addItemToInventory = (item: { id: string; name: string; icon: string }) => {
+    setInventory(prev => {
+      const existing = prev.find(i => i.id === item.id);
+      if (existing) {
+        return prev.map(i => i.id === item.id ? { ...i, count: i.count + 1 } : i);
+      }
+      return [...prev, { ...item, count: 1 }];
+    });
+  };
+
+  const useItem = (itemId: string) => {
+    const item = inventory.find(i => i.id === itemId);
+    if (!item || item.count <= 0) return;
+
+    setInventory(prev => prev.map(i => i.id === itemId ? { ...i, count: i.count - 1 } : i).filter(i => i.count > 0));
+    
+    if (itemId === 'potion') {
+      setMood('sleepy');
+      const prevTheme = theme;
+      setTheme('purple');
+      setShowNotification("🧪 꿈결 물약을 마셨어용... 포근이가 꿈의 세계로 안내해용! ✨");
+      triggerFloatingIcon("🔮");
+      setTimeout(() => {
+        setTheme(prevTheme);
+        setMood('happy');
+      }, 15000);
+    }
+    
+    playSound('pop');
+    setMood('happy');
+    const reactions = {
+      fish: "냠냠! 연어가 입에서 살살 녹아용~ 🐟💖",
+      yarn: "우와! 이거 넘 재미있어용! 같이 놀아용! 🧶✨",
+      ribbon: "포근이 좀 예쁜가용? 어울리나용? 🎀🐾",
+      milk: "고소한 우유~ 힘이 불끈불끈 나용! 🥛🌈",
+      catnip: "우와아아아!! 기분이 넘넘 좋아용! 냥냥냥! 🍃✨",
+      potion: "몽글몽글한 기분이 들어용... 꿈속을 걷는 것 같아용! 🧪✨",
+      heart_cookie: "달콤한 쿠키! 우리 우정도 더 달콤해지겠네용! 🍪💖",
+      magic_stone: "우와!! 이렇게 반짝이는 걸 저에게 주시다니!! 💎✨",
+      lucky_bag: "뭐가 들어있을까용? 두근두근... 열어볼게용! 💰✨",
+      cat_tower: "와아아!! 꿈에 그리던 캣타워에용! 여기서 살래용! 🏰😻"
+    };
+
+    if (itemId === 'lucky_bag') {
+      const gachaItems = [
+        { id: 'fish', name: '고급 연어', icon: '🐟' },
+        { id: 'catnip', name: '마법 캣닢', icon: '🍃' },
+        { id: 'potion', name: '꿈결 물약', icon: '🧪' },
+        { id: 'magic_stone', name: '영롱한 보석', icon: '💎' }
+      ];
+      const gacha = gachaItems[Math.floor(Math.random() * gachaItems.length)];
+      addItemToInventory(gacha);
+      setShowNotification(`💰 복주머니에서 [${gacha.icon} ${gacha.name}]이 나왔어용! ✨`);
+    }
+    
+    let scoreGain = 5;
+    if (itemId === 'catnip') scoreGain = 15;
+    if (itemId === 'magic_stone') scoreGain = 20;
+    if (itemId === 'heart_cookie') scoreGain = 8;
+    
+    setCatDialogue(reactions[itemId as keyof typeof reactions] || "고마워용! ✨");
+    setFriendshipScore(s => s + scoreGain);
+    setMagicDust(d => d + Math.floor(scoreGain / 2));
+    fireConfetti();
+    triggerFloatingIcon("✨");
+    
+    if (itemId === 'fish') updateMission("포근이에게 간식 주기");
+    if (itemId === 'ribbon' || itemId === 'yarn' || itemId === 'magic_stone' || itemId === 'cat_tower') addItemToRoom(itemId);
+    
+    if (itemId === 'rainbow_candy') {
+      const themes: ("pink" | "blue" | "mint" | "purple")[] = ["pink", "blue", "mint", "purple"];
+      const nextTheme = themes[Math.floor(Math.random() * themes.length)];
+      setTheme(nextTheme);
+      setMood('energetic');
+      fireConfetti();
+      triggerFloatingIcon("🌈");
+      setShowNotification(`🍭 무지개 사탕의 마법! 분위기가 [${nextTheme}]로 바뀌었어용! ✨`);
+    }
+    
+    if (itemId === 'potion') {
+      setDreamMode(true);
+      setMood('sleepy');
+      setCatDialogue("우와아.. 몽글몽글 기분이 좋아용.. 꿈속인가용? 🧪✨");
+      fireConfetti();
+      setTimeout(() => {
+        setDreamMode(false);
+        setMood('happy');
+        setCatDialogue("");
+      }, 20000);
+    }
+    
+    setTimeout(() => {
+      setCatDialogue("");
+    }, 4000);
+  };
+
+  useEffect(() => {
     localStorage.setItem("pogn_diaries", JSON.stringify(diaries));
   }, [diaries]);
 
@@ -436,11 +853,13 @@ export default function ChatInterface() {
       const newDiary = {
         id: Date.now().toString(),
         date: new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' }),
-        content
+        content,
+        friendshipAtTime: friendshipScore
       };
       
       setDiaries(prev => [newDiary, ...prev]);
       setShowDiary(true);
+      setShowNotification("📔 포근이가 일기를 다 썼어용! ✨");
       addAchievement("일기 쓰는 고양이", "📔");
       updateMission("오늘의 일기 쓰기");
       fireConfetti();
@@ -451,6 +870,17 @@ export default function ChatInterface() {
       setIsLoading(false);
       setMood("happy");
     }
+  };
+
+  const addToAlbum = (url: string, caption: string) => {
+    const newItem = {
+      id: Date.now().toString(),
+      url,
+      date: new Date().toLocaleDateString(),
+      caption
+    };
+    setAlbum(prev => [newItem, ...prev]);
+    addAchievement("기억 보관사", "🖼️");
   };
 
   const addAchievement = (title: string, icon: string) => {
@@ -471,20 +901,54 @@ export default function ChatInterface() {
   const handlePet = () => {
     const dialogues = ["기분 좋아용~ 🐾", "골골송 부르는 중.. 🎶", "주인님 손길이 젤 좋아용! 💖", "에헤헤~ 신난다용! ✨", "사랑해용! 🍭"];
     setCatDialogue(dialogues[Math.floor(Math.random() * dialogues.length)]);
-    setPetCount(prev => prev + 1);
-    const newScore = friendshipScore + 0.5;
+    setPetCount(prev => {
+      const newCount = prev + 1;
+      if (newCount === 50) {
+        addAchievement("포근이 마스터", "👑");
+        setShowNotification("✨ 포근이가 당신을 진심으로 신뢰하게 되었어용! ✨");
+        fireConfetti();
+      }
+      return newCount;
+    });
+
+    const isCritical = Math.random() > 0.9;
+    const isTummy = Math.random() > 0.8;
+    const gain = isCritical ? 1 : 0.1;
+
+    if (isCritical) {
+      triggerFloatingIcon("❤️");
+      setCatDialogue("앗! 거기는 넘 기분 좋아용!! 😻✨");
+      fireConfetti();
+    } else if (isTummy) {
+      triggerFloatingIcon("🐾");
+      setCatDialogue("냥냥! 배 만지는 건 부끄러워용.. 😺");
+    } else {
+      triggerFloatingIcon("💖");
+    }
+
+    const newScore = friendshipScore + gain;
     setFriendshipScore(newScore);
     localStorage.setItem("pogn_score", newScore.toString());
-    setMood("energetic");
+    setMood("happy");
     playSound('pop');
-    setTimeout(() => {
-      setMood("happy");
-      setCatDialogue("");
-    }, 2000);
+    if (Math.random() > 0.5) triggerFloatingIcon("✨");
     
-    if ((petCount + 1) % 5 === 0) {
+    // 10% 확률로 아이템 발견!
+    if (Math.random() < 0.1) {
+      const lootOptions = [
+        { id: 'yarn', name: '마법 실뭉치', icon: '🧶' },
+        { id: 'ribbon', name: '핑크 리본', icon: '🎀' },
+        { id: 'toy', name: '장난감 쥐', icon: '🐭' }
+      ];
+      const loot = lootOptions[Math.floor(Math.random() * lootOptions.length)];
+      addItemToInventory(loot);
+      setShowNotification(`✨ 쓰다듬다가 발견했어용! [${loot.icon} ${loot.name}]`);
       fireConfetti();
     }
+
+    setTimeout(() => {
+      setCatDialogue("");
+    }, 3000);
   };
 
   const handleFortune = () => {
@@ -524,6 +988,8 @@ export default function ChatInterface() {
     setTimeout(() => setMood("happy"), 2000);
     fireConfetti();
     playSound('pop');
+    triggerFloatingIcon("🍖");
+    triggerFloatingIcon("✨");
     const newScore = friendshipScore + 1.5;
     setFriendshipScore(newScore);
     localStorage.setItem("pogn_score", newScore.toString());
@@ -554,42 +1020,71 @@ export default function ChatInterface() {
 
   // Mini Game Component
   const HeartCatchGame = () => {
-    const [gameHearts, setGameHearts] = useState<{ id: number; left: number; type: 'heart' | 'treat' }[]>([]);
+    const [gameHearts, setGameHearts] = useState<{ id: number; left: number; type: 'heart' | 'treat' | 'gold_heart' | 'star' }[]>([]);
     const [score, setScore] = useState(0);
+    const [currentTime, setCurrentTime] = useState(15);
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
       const interval = setInterval(() => {
+        const rand = Math.random();
+        let type: 'heart' | 'treat' | 'gold_heart' | 'star' = 'heart';
+        if (rand > 0.95) type = 'star';
+        else if (rand > 0.85) type = 'gold_heart';
+        else if (rand > 0.6) type = 'treat';
+
         setGameHearts(prev => [
           ...prev, 
           { 
             id: Date.now(), 
             left: Math.random() * 90, 
-            type: Math.random() > 0.3 ? 'heart' : 'treat' 
+            type
           }
         ]);
-      }, 800);
+      }, 700);
+
+      const timerInterval = setInterval(() => {
+        setCurrentTime(t => Math.max(0, t - 1));
+      }, 1000);
 
       const cleanup = setInterval(() => {
         setGameHearts(prev => prev.filter(h => Date.now() - h.id < 3000));
       }, 1000);
 
-      const timer = setTimeout(() => {
+      const gameEndTimer = setTimeout(() => {
         clearInterval(interval);
         clearInterval(cleanup);
+        clearInterval(timerInterval);
         setShowGame(false);
         const bonus = score * 0.1;
         setFriendshipScore(s => s + bonus);
-        setShowNotification(`게임 종료! 우정 점수 +${bonus.toFixed(1)}점 획득! 💖`);
-        if (score >= 10) addAchievement("게임 마스터", "🎮");
+        setShowNotification(`🎮 게임 종료! 점수: ${score} | 우정 점수 +${bonus.toFixed(1)}점! 💖`);
+        if (score >= 20) addAchievement("게임 달인", "🔥");
       }, 15000);
 
       return () => {
         clearInterval(interval);
         clearInterval(cleanup);
-        clearTimeout(timer);
+        clearInterval(timerInterval);
+        clearTimeout(gameEndTimer);
       };
     }, []);
+
+    const handleCatch = (h: { id: number; type: string }) => {
+      let points = 1;
+      if (h.type === 'treat') points = 2;
+      if (h.type === 'gold_heart') points = 5;
+      if (h.type === 'star') {
+        points = 1;
+        setMagicDust(d => d + 10);
+        triggerFloatingIcon("✨");
+      }
+      
+      setScore(s => s + points);
+      playSound('pop');
+      setGameHearts(prev => prev.filter(heart => heart.id !== h.id));
+      if (h.type === 'gold_heart' || h.type === 'star') fireConfetti();
+    };
 
     return (
       <motion.div 
@@ -598,38 +1093,270 @@ export default function ChatInterface() {
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-[400] bg-cute-pink/20 backdrop-blur-md flex flex-col items-center justify-center pointer-events-none"
       >
-        <div className="bg-white/80 p-6 rounded-full shadow-2xl border-4 border-white mb-10 pointer-events-auto">
-          <span className="text-3xl font-black text-cute-pink font-cute">점수: {score} ✨</span>
+        <div className="flex gap-4 mb-10 pointer-events-auto">
+          <div className="bg-white/80 p-4 rounded-[25px] shadow-2xl border-4 border-white flex flex-col items-center min-w-[100px]">
+            <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Score</span>
+            <span className="text-3xl font-black text-cute-pink font-cute">{score}</span>
+          </div>
+          <div className="bg-white/80 p-4 rounded-[25px] shadow-2xl border-4 border-white flex flex-col items-center min-w-[100px]">
+            <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Time</span>
+            <span className="text-3xl font-black text-slate-700 font-cute">{currentTime}s</span>
+          </div>
         </div>
         <div className="w-full h-full relative pointer-events-auto overflow-hidden" ref={containerRef}>
           <AnimatePresence>
             {gameHearts.map(h => (
               <motion.button
                 key={h.id}
-                initial={{ y: -50, x: `${h.left}%`, opacity: 0 }}
-                animate={{ y: 800, opacity: 1 }}
+                initial={{ y: -50, x: `${h.left}%`, opacity: 0, scale: 0.5 }}
+                animate={{ y: 900, opacity: 1, scale: 1 }}
                 exit={{ scale: 2, opacity: 0 }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setScore(s => s + 1);
-                  playSound('pop');
-                  setGameHearts(prev => prev.filter(heart => heart.id !== h.id));
+                  handleCatch(h);
                 }}
-                className="absolute text-4xl p-2 cursor-pointer hover:scale-125 transition-transform"
+                className={cn(
+                  "absolute text-4xl p-2 cursor-pointer transition-transform hover:scale-125 z-10",
+                  h.type === 'gold_heart' ? "drop-shadow-[0_0_10px_rgba(251,191,36,0.8)]" : "",
+                  h.type === 'star' ? "drop-shadow-[0_0_15px_rgba(34,211,238,0.8)]" : ""
+                )}
               >
-                {h.type === 'heart' ? "💖" : "🍖"}
+                {h.type === 'heart' ? "💖" : h.type === 'treat' ? "🍖" : h.type === 'gold_heart' ? "💝" : "⭐"}
               </motion.button>
             ))}
           </AnimatePresence>
         </div>
-        <div className="absolute top-10 text-white font-black text-xl px-8 py-2 bg-slate-800/20 rounded-full backdrop-blur-sm">떨어지는 하트를 잡아보세용! (15초) 🐾</div>
+        <div className="absolute top-10 text-white font-black text-xl px-8 py-2 bg-slate-800/20 rounded-full backdrop-blur-sm">떨어지는 아이템들을 모두 탭하세용! ✨🐾</div>
       </motion.div>
     );
   };
 
+  const WeatherOverlay = () => {
+    const icons = {
+      clear: [],
+      rain: ["💧", "💧", "💧"],
+      snow: ["❄️", "❄️", "❄️"],
+      petals: ["🌸", "🌸", "✨"]
+    };
+    
+    if (weather === "clear") return null;
+
+    return (
+      <div className="fixed inset-0 pointer-events-none z-[150] overflow-hidden">
+        {[...Array(10)].map((_, i) => (
+          <motion.div
+            key={i}
+            initial={{ y: -50, x: `${Math.random() * 100}%`, opacity: 0 }}
+            animate={{ 
+              y: 1000, 
+              x: `${(Math.random() * 10) + (i * 5)}%`, 
+              opacity: [0, 1, 1, 0],
+              rotate: 360 
+            }}
+            transition={{ 
+              duration: weather === "rain" ? 1 : 5, 
+              repeat: Infinity, 
+              delay: Math.random() * 5,
+              ease: "linear"
+            }}
+            className="absolute text-2xl"
+          >
+            {icons[weather][Math.floor(Math.random() * icons[weather].length)]}
+          </motion.div>
+        ))}
+      </div>
+    );
+  };
+
+  const buyItem = (item: { id: string; name: string; icon: string; cost: number }) => {
+    if (magicDust >= item.cost) {
+      setMagicDust(d => d - item.cost);
+      addItemToInventory({ id: item.id, name: item.name, icon: item.icon });
+      setShowNotification(`🛍️ 구매 성공! [${item.icon} ${item.name}]이 가방에 들어왔어용! ✨`);
+      
+      // Auto-equip if it's a room deco
+      if (item.id === 'magic_stone' || item.id === 'yarn' || item.id === 'cat_tower' || item.id === 'ribbon') {
+        addItemToRoom(item.id);
+      }
+      
+      fireConfetti();
+      playSound('receive');
+    } else {
+      setShowNotification("😿 아직 마법 가루가 부족해용... 더 많이 놀아주세용! ✨");
+    }
+  };
+
+  const shopItems = [
+    { id: 'fish', name: '고급 연어', icon: '🐟', cost: 10, desc: "포근이가 가장 좋아하는 최고급 연어에용!" },
+    { id: 'catnip', name: '마법 캣닢', icon: '🍃', cost: 30, desc: "포근이를 엄청 신나게 만들어줘용! (우정 대폭 상승)" },
+    { id: 'magic_stone', name: '영롱한 보석', icon: '💎', cost: 100, desc: "방을 장식할 수 있는 아주 희귀하고 예쁜 보석이에용!" },
+    { id: 'yarn', name: '마법 실뭉치', icon: '🧶', cost: 15, desc: "방에 놓으면 포근이가 신나게 놀아용!" },
+    { id: 'potion', name: '꿈결 물약', icon: '🧪', cost: 50, desc: "포근이의 꿈속 이야기를 들을 수 있을지도 몰라용!" },
+    { id: 'heart_cookie', name: '하트 쿠키', icon: '🍪', cost: 5, desc: "작지만 달콤한 우정의 증표에용! ✨" },
+    { id: 'ribbon', name: '핑크 리본', icon: '🎀', cost: 12, desc: "포근이의 방을 더 러블리하게 꾸며줘용! 💖" },
+    { id: 'cat_tower', name: '폭신폭신 캣타워', icon: '🏰', cost: 150, desc: "포근이가 가장 갖고 싶어하는 꿈의 성이에용!" },
+    { id: 'lucky_bag', name: '행운의 복주머니', icon: '💰', cost: 40, desc: "어떤 선물이 들어있을지 몰라용! 두근두근! 🐾" },
+    { id: 'rainbow_candy', name: '무지개 사탕', icon: '🍭', cost: 15, desc: "포근이의 색깔이 바뀔지도...? (랜덤 테마 변경)" },
+    { id: 'magic_wand', name: '마법 지팡이', icon: '🪄', cost: 200, desc: "포근이와 함께라면 무엇이든 할 수 있을 것 같아용!" }
+  ];
+
+  const [showMissions, setShowMissions] = useState(false);
+
+  const [showAchievements, setShowAchievements] = useState(false);
+
+  const achievementDetails: { [key: string]: { icon: string, desc: string } } = {
+    "첫 만남": { icon: "👋", desc: "포근이를 처음 만났어용!" },
+    "베스트 프렌드": { icon: "✨", desc: "포근이와 아주 친한 사이가 되었어용!" },
+    "전설의 파트너": { icon: "💍", desc: "포근이에게 가장 소중한 사람이 되었어용!" },
+    "수다쟁이": { icon: "🗣️", desc: "포근이와 10번 이상 대화했어용!" },
+    "포근이 마스터": { icon: "👑", desc: "우정의 정점에 도달했어용!" },
+    "게임 달인": { icon: "🔥", desc: "게임에서 높은 점수를 기록했어용!" },
+    "일기 쓰는 고양이": { icon: "📔", desc: "일기장에 첫 추억을 남겼어용!" },
+    "기억 보관사": { icon: "🖼️", desc: "앨범에 추억을 저장했어용!" }
+  };
+
+  const getMoodAuraColor = () => {
+    switch (mood) {
+      case 'happy': return "from-yellow-200/40 to-amber-200/40";
+      case 'sleepy': return "from-indigo-200/40 to-purple-200/40";
+      case 'energetic': return "from-rose-400/20 to-pink-400/20";
+      default: return "from-white/20 to-slate-200/20";
+    }
+  };
+
+  const AchievementsModal = () => {
+    return (
+      <AnimatePresence>
+        {showAchievements && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[865] bg-amber-500/10 backdrop-blur-md flex items-center justify-center p-6"
+            onClick={() => setShowAchievements(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 50 }}
+              animate={{ scale: 1, y: 0 }}
+              className="bg-white/95 backdrop-blur-xl p-10 rounded-[50px] shadow-2xl border-4 border-white max-w-lg w-full font-cute"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-4">
+                  <div className="bg-amber-400 p-3 rounded-[24px] text-white">
+                    <Medal size={32} />
+                  </div>
+                  <h2 className="text-3xl font-black text-slate-800 tracking-tight">우리의 추억 🏆</h2>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setShowAchievements(false)} className="rounded-full">
+                  <X />
+                </Button>
+              </div>
+
+              <ScrollArea className="max-h-[60vh] pr-4">
+                <div className="grid grid-cols-1 gap-4">
+                  {Object.entries(achievementDetails).map(([title, detail], i) => {
+                    const isUnlocked = achievements.includes(title);
+                    return (
+                      <motion.div 
+                        key={title}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.05 }}
+                        className={cn(
+                          "flex items-center gap-5 p-5 rounded-[30px] border-4 transition-all shadow-sm",
+                          isUnlocked ? "bg-white border-amber-200" : "bg-slate-50 border-slate-100 grayscale opacity-40"
+                        )}
+                      >
+                        <div className="text-5xl">{detail.icon}</div>
+                        <div className="flex flex-col gap-1">
+                          <h4 className="text-xl font-black text-slate-800 leading-none">
+                            {isUnlocked ? title : "???"}
+                          </h4>
+                          <p className="text-sm text-slate-400 font-bold leading-tight">
+                            {isUnlocked ? detail.desc : "아직 발견하지 못했어용..."}
+                          </p>
+                        </div>
+                        {isUnlocked && (
+                          <div className="ml-auto bg-amber-400 text-white p-2 rounded-full shadow-lg scale-75">
+                            <Check size={16} strokeWidth={4} />
+                          </div>
+                        )}
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+              
+              <div className="mt-8 p-6 bg-amber-50 rounded-[35px] border-2 border-amber-100 text-center">
+                <p className="text-sm font-bold text-amber-700">
+                  포근이와의 추억이 늘어날수록 더 많은 업적이 잠금 해제되어용! ✨
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    );
+  };
+  const moodEmojiMap = {
+    happy: "😺",
+    sleepy: "😴",
+    energetic: "😼",
+    thinking: "🤔"
+  };
+
   return (
-    <div className={cn("fixed inset-0 flex flex-col font-sans overflow-hidden transition-colors duration-700", currentTheme.bg)}>
+    <div className={cn("fixed inset-0 flex flex-col font-sans overflow-hidden transition-colors duration-1000", currentTheme.bg, timeTheme, dreamMode && "bg-slate-900")}>
       <SparkleTrail />
+      <WeatherOverlay />
+      
+      {isPhotoMode && (
+        <motion.button 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          onClick={() => setIsPhotoMode(false)}
+          className="fixed top-6 right-6 z-[1000] bg-white/20 backdrop-blur-md p-4 rounded-full text-white hover:bg-white/40 transition-all font-black"
+        >
+          돌아가기 📸
+        </motion.button>
+      )}
+
+      <AnimatePresence>
+        {dreamMode && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 pointer-events-none z-[100] bg-indigo-900/40 backdrop-blur-[2px]"
+          >
+            {[...Array(50)].map((_, i) => (
+              <motion.div
+                key={i}
+                animate={{ 
+                  y: [-10, 10, -10],
+                  x: [-5, 5, -5],
+                  opacity: [0.2, 0.8, 0.2],
+                  scale: [1, 1.2, 1]
+                }}
+                transition={{ 
+                  duration: 2 + Math.random() * 3, 
+                  repeat: Infinity,
+                  delay: Math.random() * 2
+                }}
+                className="absolute text-white/40"
+                style={{ 
+                  left: `${Math.random() * 100}%`, 
+                  top: `${Math.random() * 100}%`,
+                  fontSize: `${Math.random() * 10 + 10}px`
+                }}
+              >
+                ⭐
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
       
       {/* Mini Game Overlay */}
       <AnimatePresence>
@@ -661,7 +1388,7 @@ export default function ChatInterface() {
               <ScrollArea className="flex-1 pr-4">
                 <div className="space-y-6">
                   {diaries.length === 0 ? (
-                    <div className="text-center py-20 text-slate-300 font-cute">아직 일기가 없어용. 포근이와 더 대화해볼까용? ✨</div>
+                    <div className="text-center py-20 text-slate-300 font-cute">아직 일기가 없어용. 포근이와 더 대화해보면 일기를 써줄 거예용! ✨</div>
                   ) : (
                     diaries.map(d => (
                       <div key={d.id} className="bg-white p-6 rounded-[30px] shadow-sm border-2 border-slate-50 space-y-3 relative overflow-hidden">
@@ -862,34 +1589,10 @@ export default function ChatInterface() {
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div className={cn("absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full blur-[120px] transition-colors duration-700", currentTheme.particle + "/10")} />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-cute-blue/10 rounded-full blur-[120px]" />
-        
-        {/* Floating elements */}
-        <motion.div 
-          animate={{ 
-            y: [0, -20, 0], 
-            rotate: [0, 10, -10, 0],
-            opacity: [0.1, 0.2, 0.1]
-          }}
-          transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute top-[20%] left-[15%] text-4xl opacity-10"
-        >
-          {theme === "pink" ? "🌸" : theme === "blue" ? "☁️" : theme === "mint" ? "🌿" : "🔮"}
-        </motion.div>
-        <motion.div 
-          animate={{ 
-            y: [0, 30, 0], 
-            rotate: [0, -15, 15, 0],
-            opacity: [0.05, 0.15, 0.05]
-          }}
-          transition={{ duration: 7, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-          className="absolute bottom-[25%] right-[20%] text-5xl opacity-10"
-        >
-          {theme === "pink" ? "✨" : theme === "blue" ? "⭐" : theme === "mint" ? "🍃" : "🌙"}
-        </motion.div>
       </div>
 
       {/* Main Chat Container - Full Screen */}
-      <div className="flex-1 flex flex-col relative z-10 bg-white/30 backdrop-blur-3xl">
+      <div className={cn("flex-1 flex flex-col relative z-10 bg-white/30 backdrop-blur-3xl transition-opacity duration-500", isPhotoMode && "opacity-0 pointer-events-none")}>
         {/* Header */}
         <header className="flex flex-col sm:flex-row items-center justify-between px-6 py-3 border-b-4 border-white bg-white/40 shadow-sm gap-2">
           <div className="flex items-center gap-4 w-full sm:w-auto">
@@ -901,10 +1604,33 @@ export default function ChatInterface() {
                 rotate: mood === "energetic" ? [0, 5, -5, 0] : 0
               }}
               transition={{ repeat: mood === "energetic" ? Infinity : 0, duration: 0.5 }}
-              className={cn("p-3 rounded-[20px] text-white shadow-lg relative cursor-pointer font-cute transition-all duration-500 bg-gradient-to-br", currentTheme.primary)}
+              className={cn("p-3 rounded-[20px] text-white relative cursor-pointer font-cute transition-all duration-500 bg-gradient-to-br", currentTheme.primary, getCatAura())}
               onClick={handlePet}
             >
-              <Cat size={24} />
+              {getCatIcon(24)}
+                <div className="absolute -bottom-1 -right-1 bg-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] shadow-sm border border-slate-100">
+                {moodEmojiMap[mood]}
+              </div>
+              
+              {/* Floating Icons for Header Cat */}
+              <div className="absolute inset-0 pointer-events-none">
+                <AnimatePresence>
+                  {floatingIcons.map(f => (
+                    <motion.div
+                      key={f.id}
+                      initial={{ opacity: 0, scale: 0, y: 0 }}
+                      animate={{ opacity: [0, 1, 0], scale: [0.5, 1.2, 0.8], y: -80 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 1.5 }}
+                      className="absolute text-2xl -left-2"
+                      style={{ top: '0%' }}
+                    >
+                      {f.icon}
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+
               {friendshipLevel >= 10 && (
                 <motion.div 
                   initial={{ opacity: 0, y: 10 }}
@@ -964,6 +1690,11 @@ export default function ChatInterface() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 bg-white/80 px-2 py-1 rounded-full border border-slate-100 shadow-sm">
+                  <div className="text-[10px] text-amber-500 font-bold flex items-center gap-1">
+                    <Sparkles size={10} fill="currentColor" /> {magicDust}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 bg-white/80 px-2 py-1 rounded-full border border-slate-100 shadow-sm">
                   {getMoodIcon()}
                   <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest leading-none">
                     {mood === "thinking" ? "고민 중..." : mood === "sleepy" ? "졸려요.." : mood === "energetic" ? "신나요!" : "행복함"}
@@ -973,40 +1704,103 @@ export default function ChatInterface() {
             </div>
           </div>
           
-          <div className="flex items-center gap-1 sm:gap-2">
+          <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
             <Button 
               variant="ghost" 
               size="icon" 
-              onClick={() => { setShowGame(true); playSound('pop'); }} 
-              className="rounded-full h-8 w-8 text-cute-pink hover:bg-cute-pink/10 transition-all"
-              title="미니게임"
+              onClick={() => { setShowShop(true); playSound('pop'); }} 
+              className={cn("rounded-full h-8 w-8 transition-all", showShop ? "text-amber-500 bg-amber-50" : "text-slate-300")}
+              title="마법 상점 🛍️"
             >
-              <Gamepad2 size={18} />
+              <ShoppingCart size={18} />
             </Button>
             <Button 
               variant="ghost" 
               size="icon" 
-              onClick={() => { setShowDiary(true); playSound('pop'); }} 
-              className="rounded-full h-8 w-8 text-cute-purple hover:bg-cute-purple/10 transition-all"
-              title="일기장"
+              onClick={() => { setShowInventory(true); playSound('pop'); }} 
+              className="rounded-full h-8 w-8 text-cute-blue hover:bg-cute-blue/10 transition-all"
+              title="포근이의 가방 🎒"
             >
-              <Book size={18} />
+              <Package size={18} />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={toggleRoom} 
+              className={cn("rounded-full h-8 w-8 transition-all", showRoom ? "text-cute-pink bg-cute-pink/10" : "text-slate-300")}
+              title="포근이의 비밀 방 🏠"
+            >
+              <Home size={18} />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setIsPhotoMode(!isPhotoMode)} 
+              className={cn("rounded-full h-8 w-8 transition-all", isPhotoMode ? "text-cute-pink bg-cute-pink/10" : "text-slate-300")}
+              title="사진 모드 (UI 숨기기) 📸"
+            >
+              <Camera size={18} />
             </Button>
             <Button 
               variant="ghost" 
               size="icon" 
               onClick={() => { setShowAlbum(true); playSound('pop'); }} 
               className="rounded-full h-8 w-8 text-cute-blue hover:bg-cute-blue/10 transition-all"
-              title="앨범"
+              title="앨범 📸"
             >
-              <ImageIcon size={18} />
+              <Camera size={18} />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={toggleAlchemy} 
+              className={cn("rounded-full h-8 w-8 transition-all", showAlchemy ? "text-cute-purple bg-cute-purple/10" : "text-slate-300")}
+              title="마법 연금술 (아이템 조합) 🧪"
+            >
+              <Wand2 size={18} />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => { setShowMissions(true); playSound('pop'); }} 
+              className={cn("rounded-full h-8 w-8 transition-all", showMissions ? "text-cute-pink bg-cute-pink/10" : "text-slate-300")}
+              title="오늘의 미션 🐾"
+            >
+              <Trophy size={18} />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => { setShowAchievements(true); playSound('pop'); }} 
+              className={cn("rounded-full h-8 w-8 transition-all", showAchievements ? "text-amber-500 bg-amber-50" : "text-slate-300")}
+              title="업적 확인 🏆"
+            >
+              <Medal size={18} />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => { setShowDiary(true); playSound('pop'); }} 
+              className="rounded-full h-8 w-8 text-cute-purple hover:bg-cute-purple/10 transition-all"
+              title="일기장 📔"
+            >
+              <Book size={18} />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => { setShowGame(true); playSound('pop'); }} 
+              className="rounded-full h-8 w-8 text-cute-pink hover:bg-cute-pink/10 transition-all"
+              title="미니게임 🎮"
+            >
+              <Gamepad2 size={18} />
             </Button>
             <Button 
               variant="ghost" 
               size="icon" 
               onClick={handleGiveTreat}
               className="rounded-full h-8 w-8 text-cute-pink hover:bg-cute-pink/10 transition-all"
-              title="간식 주기"
+              title="간식 주기 🍖"
             >
               <UtensilsCrossed size={18} />
             </Button>
@@ -1015,45 +1809,19 @@ export default function ChatInterface() {
               size="icon" 
               onClick={() => setShowSettings(!showSettings)} 
               className={cn("rounded-full h-8 w-8 transition-all", showSettings ? "text-cute-pink rotate-90" : "text-slate-300")}
-              title="설정"
+              title="설정 ⚙️"
             >
               <Smile size={18} />
-            </Button>
-            <Button 
-              variant="ghost" 
-              onClick={() => { fireConfetti(); playSound('pop'); setFriendshipScore(s => s + 0.1); }} 
-              className="rounded-full h-8 w-8 text-cute-yellow hover:bg-cute-yellow/10 transition-all"
-            >
-              <Gift size={18} />
             </Button>
             <Button 
               variant="ghost" 
               size="icon" 
               onClick={toggleBgm} 
               className={cn("rounded-full h-8 w-8 transition-all", isBgmPlaying ? "text-cute-pink animate-pulse" : "text-slate-300")}
-              title="배경음악"
+              title="배경음악 🎶"
             >
               <Music size={18} />
             </Button>
-            <div className="flex items-center gap-2 group/vol">
-              <input 
-                type="range" 
-                min="0" 
-                max="0.5" 
-                step="0.01" 
-                value={volume} 
-                onChange={(e) => setVolume(parseFloat(e.target.value))}
-                className="w-16 h-1 bg-slate-100 rounded-full appearance-none cursor-pointer accent-cute-pink opacity-0 group-hover/vol:opacity-100 transition-opacity"
-              />
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => setIsMuted(!isMuted)} 
-                className="rounded-full h-8 w-8 text-slate-300 hover:text-cute-blue hover:bg-cute-blue/10 transition-all font-cute"
-              >
-                {isMuted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
-              </Button>
-            </div>
             <Button 
               variant="ghost" 
               size="icon" 
@@ -1064,6 +1832,7 @@ export default function ChatInterface() {
                 }
               }} 
               className="rounded-full h-8 w-8 text-slate-200 hover:text-cute-pink hover:bg-cute-pink/10 transition-all"
+              title="대화 삭제 🗑️"
             >
               <Trash2 size={18} />
             </Button>
@@ -1344,6 +2113,574 @@ export default function ChatInterface() {
           >
             <Moon className="rotate-180" size={20} />
           </motion.button>
+        )}
+      </AnimatePresence>
+
+      {/* Room Modal */}
+      <AnimatePresence>
+        {showRoom && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[800] bg-white/60 backdrop-blur-3xl flex items-center justify-center p-0"
+          >
+            <div className="absolute inset-0 bg-gradient-to-b from-blue-50/50 to-white pointer-events-none" />
+            
+            <div className="relative w-full h-full flex flex-col p-8 max-w-5xl">
+              <div className="flex justify-between items-center z-10">
+                <div>
+                  <h2 className="text-4xl font-black text-slate-800 font-cute text-center sm:text-left">포근이의 비밀 방 🏠</h2>
+                  <p className="text-slate-400 font-bold mt-2 text-center sm:text-left">나만의 공간에서 편히 쉬고 있어용! ✨</p>
+                </div>
+                <Button 
+                  onClick={() => setShowRoom(false)}
+                  className="rounded-full h-14 w-14 bg-white shadow-xl hover:scale-110 active:scale-95 transition-all text-slate-400 hover:text-cute-pink border-none"
+                >
+                  <X size={30} />
+                </Button>
+              </div>
+
+              <div className="flex-1 relative flex items-center justify-center overflow-hidden">
+                {/* Furniture Items */}
+                <div className="absolute inset-0 pointer-events-none">
+                  {roomItems.includes('yarn') && (
+                    <motion.div 
+                      initial={{ scale: 0 }} 
+                      animate={{ scale: 1 }} 
+                      whileTap={{ scale: 1.2 }}
+                      onClick={(e) => { e.stopPropagation(); playSound('pop'); triggerFloatingIcon("🧶"); }}
+                      className="absolute bottom-[20%] left-[10%] text-7xl drop-shadow-xl z-10 pointer-events-auto cursor-pointer" 
+                      title="마법 실뭉치"
+                    >
+                      🧶
+                    </motion.div>
+                  )}
+                  {roomItems.includes('ribbon') && (
+                    <motion.div 
+                      initial={{ scale: 0 }} 
+                      animate={{ scale: 1 }} 
+                      whileTap={{ scale: 1.1 }}
+                      onClick={(e) => { e.stopPropagation(); playSound('pop'); triggerFloatingIcon("🎀"); }}
+                      className="absolute top-[30%] right-[15%] text-6xl drop-shadow-xl z-0 pointer-events-auto cursor-pointer" 
+                      title="핑크 리본"
+                    >
+                      🎀
+                    </motion.div>
+                  )}
+                  {roomItems.includes('toy') && (
+                    <motion.div 
+                      initial={{ scale: 0 }} 
+                      animate={{ scale: 1 }} 
+                      whileTap={{ scale: 0.9, rotate: -20 }}
+                      onClick={(e) => { e.stopPropagation(); playSound('pop'); triggerFloatingIcon("🐭"); }}
+                      className="absolute bottom-[10%] right-[20%] text-5xl rotate-12 drop-shadow-lg z-10 pointer-events-auto cursor-pointer" 
+                      title="장난감 쥐"
+                    >
+                      🐭
+                    </motion.div>
+                  )}
+                  {roomItems.includes('magic_stone') && (
+                    <motion.div 
+                      initial={{ scale: 0 }} 
+                      animate={{ scale: 1 }} 
+                      whileHover={{ scale: 1.1 }}
+                      onClick={(e) => { e.stopPropagation(); playSound('magic'); triggerFloatingIcon("💎"); fireConfetti(); }}
+                      className="absolute top-[20%] left-[20%] text-5xl drop-shadow-[0_0_15px_rgba(34,211,238,0.5)] z-0 pointer-events-auto cursor-pointer" 
+                      title="영롱한 보석"
+                    >
+                      💎
+                    </motion.div>
+                  )}
+                  {roomItems.includes('cat_tower') && (
+                    <motion.div 
+                      initial={{ scale: 0 }} 
+                      animate={{ scale: 1 }} 
+                      className="absolute bottom-[10%] left-[5%] text-9xl drop-shadow-2xl z-0 pointer-events-auto cursor-pointer" 
+                      onClick={(e) => { e.stopPropagation(); playSound('pop'); triggerFloatingIcon("🏰"); }}
+                      title="폭신폭신 캣타워"
+                    >
+                      🏰
+                    </motion.div>
+                  )}
+                  {roomItems.includes('forest') && (
+                    <motion.div 
+                      initial={{ scale: 0, opacity: 0 }} 
+                      animate={{ scale: 1, opacity: 0.4 }} 
+                      className="absolute top-[5%] left-[35%] text-[120px] blur-[2px] z-0 pointer-events-none" 
+                      title="꿈의 숲"
+                    >
+                      🌳
+                    </motion.div>
+                  )}
+                  {roomItems.includes('tiara') && (
+                    <motion.div 
+                      initial={{ scale: 0 }} 
+                      animate={{ 
+                        scale: 1,
+                        y: [0, -15, 0]
+                      }} 
+                      transition={{ 
+                        scale: { duration: 0.5 },
+                        y: { duration: 3, repeat: Infinity, ease: "easeInOut" }
+                      }}
+                      className="absolute top-[18%] left-[45%] text-6xl drop-shadow-[0_0_20px_rgba(251,191,36,0.5)] z-20 pointer-events-auto cursor-pointer" 
+                      onClick={(e) => { e.stopPropagation(); playSound('magic'); triggerFloatingIcon("👑"); }}
+                      title="별빛 티아라"
+                    >
+                      👑
+                    </motion.div>
+                  )}
+                </div>
+
+                {/* The Big Cat */}
+                <motion.div
+                  animate={{ 
+                    y: [0, -15, 0],
+                    scale: [1, 1.02, 1],
+                  }}
+                  transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+                  className="relative cursor-pointer group"
+                  onClick={handlePet}
+                >
+                  <div className="absolute -inset-10 bg-cute-pink/10 rounded-full blur-3xl group-hover:bg-cute-pink/20 transition-all" />
+                  
+                  {/* Mood Aura */}
+                  <motion.div 
+                    animate={{ 
+                      scale: [1, 1.2, 1],
+                      opacity: [0.3, 0.6, 0.3]
+                    }}
+                    transition={{ duration: 3, repeat: Infinity }}
+                    className={cn("absolute -inset-20 rounded-full blur-[80px] bg-gradient-to-br transition-all duration-1000", getMoodAuraColor())} 
+                  />
+
+                  <Cat size={240} className={cn("transition-colors duration-1000 relative drop-shadow-2xl", currentTheme.text, friendshipLevel >= 10 && "animate-pulse")} />
+                  
+                  {friendshipLevel >= 10 && (
+                    <div className="absolute inset-0 bg-yellow-400/10 rounded-full blur-[100px] animate-pulse" />
+                  )}
+
+                  {/* Pogn's Thought Bubble */}
+                  <AnimatePresence>
+                    {pognThought && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 20, scale: 0.8 }}
+                        animate={{ opacity: 1, y: -20, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        className="absolute -top-24 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-md px-6 py-3 rounded-[30px] border-4 border-white shadow-xl z-50 min-w-[200px] text-center"
+                      >
+                        <p className="text-slate-700 font-bold text-lg whitespace-nowrap">{pognThought}</p>
+                        <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-8 h-8 bg-white border-b-4 border-r-4 border-white rotate-45" />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  
+                  {/* Floating Icons Container */}
+                  <div className="absolute inset-0 pointer-events-none z-40">
+                    <AnimatePresence>
+                      {floatingIcons.map(f => (
+                        <motion.div
+                          key={f.id}
+                          initial={{ opacity: 0, scale: 0, y: 0 }}
+                          animate={{ opacity: [0, 1, 1, 0], scale: [0.5, 1.5, 1], y: -150, x: (Math.random() - 0.5) * 50 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 1.5, ease: "easeOut" }}
+                          className="absolute text-5xl"
+                          style={{ left: `${f.x}%`, top: `${f.y}%` }}
+                        >
+                          {f.icon}
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                  </div>
+                  
+                  {/* Mood Bubble in Room */}
+                  <motion.div
+                    animate={{ y: [0, -5, 0] }}
+                    transition={{ repeat: Infinity, duration: 2 }}
+                    className="absolute -top-10 -right-10 bg-white w-20 h-20 rounded-full shadow-2xl flex items-center justify-center text-4xl border-4 border-white z-30"
+                  >
+                    {moodEmojiMap[mood]}
+                  </motion.div>
+                  
+                  <AnimatePresence>
+                    {catDialogue && (
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0, y: 0 }}
+                        animate={{ opacity: 1, scale: 1, y: -80 }}
+                        exit={{ opacity: 0, scale: 0 }}
+                        className="absolute top-0 left-1/2 -translate-x-1/2 bg-white px-8 py-4 rounded-[40px] shadow-2xl border-4 border-slate-50 text-xl font-black text-slate-700 whitespace-nowrap z-20 font-cute"
+                      >
+                        {catDialogue}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              </div>
+
+              {/* Status Section in Room */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6 mb-8 z-10">
+                <div className="bg-white/80 p-4 sm:p-6 rounded-[35px] shadow-xl border-4 border-white flex flex-col items-center gap-2">
+                  <div className="text-2xl sm:text-3xl">💖</div>
+                  <span className="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest">친밀도</span>
+                  <div className="text-xl sm:text-2xl font-black text-cute-pink">{Math.floor(friendshipScore)}</div>
+                </div>
+                <div className="bg-white/80 p-4 sm:p-6 rounded-[35px] shadow-xl border-4 border-white flex flex-col items-center gap-2">
+                  <div className="text-2xl sm:text-3xl">✨</div>
+                  <span className="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest">레벨</span>
+                  <div className="text-xl sm:text-2xl font-black text-cute-purple">{friendshipLevel}</div>
+                </div>
+                <div className="bg-white/80 hidden sm:flex p-6 rounded-[35px] shadow-xl border-4 border-white flex flex-col items-center gap-2">
+                  <div className="text-3xl">🐾</div>
+                  <span className="text-xs font-black text-slate-400 uppercase tracking-widest">방 물건</span>
+                  <div className="text-2xl font-black text-cute-blue">{roomItems.length}개</div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Daily Gift Overlay */}
+      <AnimatePresence>
+        {showGiftBox && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-md flex items-center justify-center p-6"
+          >
+            <motion.div 
+              initial={{ scale: 0.5, y: 100 }}
+              animate={{ scale: 1, y: 0 }}
+              className="bg-white rounded-[50px] p-10 text-center shadow-2xl relative max-w-sm w-full font-cute"
+            >
+              <div className="absolute -top-16 left-1/2 -translate-x-1/2">
+                <motion.div
+                  animate={{ y: [0, -10, 0], rotate: [0, -5, 5, 0] }}
+                  transition={{ repeat: Infinity, duration: 2 }}
+                >
+                  <Gift size={100} className="text-cute-pink drop-shadow-lg" />
+                </motion.div>
+              </div>
+              <h2 className="text-3xl font-black text-slate-800 mt-10 mb-4">오늘의 보물 상자! ✨</h2>
+              <p className="text-slate-500 mb-8 font-bold">포근이가 당신을 위해 선물을 물어왔어용! 얼른 확인해보세용! 🐾</p>
+              <Button 
+                onClick={claimReward}
+                className="w-full py-8 text-xl font-black rounded-full bg-cute-pink hover:bg-cute-pink/90 text-white shadow-lg hover:scale-105 active:scale-95 transition-all"
+              >
+                열어보기! 🎁
+              </Button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Mission Board Modal */}
+      <AchievementsModal />
+      <AnimatePresence>
+        {showMissions && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[860] bg-cute-pink/10 backdrop-blur-md flex items-center justify-center p-6"
+            onClick={() => setShowMissions(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 50 }}
+              animate={{ scale: 1, y: 0 }}
+              className="bg-white/95 backdrop-blur-xl p-10 rounded-[50px] shadow-2xl border-4 border-white max-w-md w-full font-cute"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-4">
+                  <div className="bg-cute-pink p-3 rounded-[24px] text-white">
+                    <Trophy size={32} />
+                  </div>
+                  <h2 className="text-3xl font-black text-slate-800 tracking-tight">오늘의 도전 🐾</h2>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setShowMissions(false)} className="rounded-full">
+                  <X />
+                </Button>
+              </div>
+
+              <div className="space-y-4 mb-8">
+                {missions.map((m, i) => (
+                  <motion.div 
+                    initial={{ x: -20, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    transition={{ delay: i * 0.1 }}
+                    key={i} 
+                    className={cn(
+                      "flex items-center justify-between p-5 rounded-[30px] border-4 transition-all shadow-sm",
+                      m.completed ? "bg-slate-50 border-slate-100 opacity-60" : "bg-white border-cute-pink/10"
+                    )}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={cn(
+                        "w-12 h-12 rounded-full flex items-center justify-center text-2xl shadow-inner",
+                        m.completed ? "bg-slate-100" : "bg-cute-pink/5"
+                      )}>
+                        {m.icon}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className={cn("text-lg font-black", m.completed ? "text-slate-400 line-through" : "text-slate-700")}>
+                          {m.title}
+                        </span>
+                        <span className="text-[10px] uppercase font-black text-slate-300 tracking-[0.2em]">우정 점수 +5점</span>
+                      </div>
+                    </div>
+                    {m.completed ? (
+                      <div className="bg-green-500 text-white p-2 rounded-full shadow-lg">
+                        <Sparkles size={16} fill="currentColor" />
+                      </div>
+                    ) : (
+                      <div className="w-8 h-8 border-4 border-slate-100 rounded-full" />
+                    )}
+                  </motion.div>
+                ))}
+              </div>
+
+              <div className="bg-cute-pink/5 p-6 rounded-[35px] border-2 border-cute-pink/10 text-center">
+                <p className="text-sm font-bold text-cute-pink">
+                  모든 미션을 완료하면 특별한 마법 가루가 생길지도 몰라용! ✨
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showShop && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[870] bg-amber-500/10 backdrop-blur-md flex items-center justify-center p-6"
+            onClick={() => setShowShop(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 50 }}
+              animate={{ scale: 1, y: 0 }}
+              className="bg-white/95 backdrop-blur-xl p-10 rounded-[50px] shadow-2xl border-4 border-white max-w-2xl w-full font-cute flex flex-col max-h-[85vh]"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-4">
+                  <div className="bg-amber-400 p-3 rounded-[24px] text-white">
+                    <ShoppingCart size={32} />
+                  </div>
+                  <div>
+                    <h2 className="text-3xl font-black text-slate-800 tracking-tight">포근이의 마법 상점 🛍️</h2>
+                    <div className="flex items-center gap-2 text-amber-500 font-bold mt-1">
+                      <Sparkles size={16} fill="currentColor" /> {magicDust} 가루 보유 중
+                    </div>
+                  </div>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setShowShop(false)} className="rounded-full">
+                  <X />
+                </Button>
+              </div>
+
+              <ScrollArea className="flex-1 pr-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {shopItems.map(item => (
+                    <div 
+                      key={item.id} 
+                      className="bg-white border-4 border-slate-50 p-6 rounded-[35px] shadow-sm flex flex-col gap-4 group hover:border-amber-200 transition-all"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="text-5xl group-hover:scale-110 transition-transform">{item.icon}</div>
+                        <div className="bg-amber-50 px-4 py-2 rounded-2xl text-amber-600 font-black flex items-center gap-2">
+                          <Sparkles size={14} fill="currentColor" /> {item.cost}
+                        </div>
+                      </div>
+                      <div>
+                        <h4 className="text-lg font-black text-slate-800">{item.name}</h4>
+                        <p className="text-sm text-slate-400 font-bold leading-tight mt-1">{item.desc}</p>
+                      </div>
+                      <Button 
+                        onClick={() => buyItem(item)}
+                        disabled={magicDust < item.cost}
+                        className="w-full rounded-2xl bg-amber-400 hover:bg-amber-500 text-white font-black py-4 h-auto shadow-md disabled:opacity-30"
+                      >
+                        구매하기 ✨
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+              
+              <div className="mt-8 p-6 bg-amber-50 rounded-[30px] border-2 border-amber-100">
+                <p className="text-xs font-bold text-amber-700 leading-relaxed text-center">
+                  마법 가루는 연금술 성공, 쓰다듬기, 일기 쓰기 등으로 얻을 수 있어용! 🪄
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Alchemy Modal */}
+      <AnimatePresence>
+        {showAlchemy && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[850] bg-cute-purple/20 backdrop-blur-md flex items-center justify-center p-6"
+            onClick={() => setShowAlchemy(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 50 }}
+              animate={{ scale: 1, y: 0 }}
+              className="bg-white/95 backdrop-blur-xl p-10 rounded-[50px] shadow-2xl border-4 border-white max-w-lg w-full font-cute"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-4">
+                  <div className="bg-cute-purple p-3 rounded-[24px] text-white animate-pulse">
+                    <Wand2 size={32} />
+                  </div>
+                  <h2 className="text-3xl font-black text-slate-800 tracking-tight">포근이의 비밀 실험실 🧪</h2>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setShowAlchemy(false)} className="rounded-full">
+                  <X />
+                </Button>
+              </div>
+
+              <div className="bg-slate-50 p-6 rounded-[35px] border-2 border-slate-100 flex items-center justify-around mb-10 min-h-[120px]">
+                {alchemyIngredients.length === 0 ? (
+                  <p className="text-slate-400 font-bold text-center">아이템을 2개 선택해주세용! ✨</p>
+                ) : (
+                  <div className="flex items-center gap-6">
+                    {alchemyIngredients.map((id, index) => {
+                      const item = inventory.find(i => i.id === id);
+                      return (
+                        <div key={index} className="flex flex-col items-center gap-2">
+                          <div className="text-5xl bg-white p-4 rounded-3xl shadow-sm border-2 border-slate-100">{item?.icon}</div>
+                          <span className="text-xs font-black text-slate-400">{item?.name}</span>
+                        </div>
+                      );
+                    })}
+                    {alchemyIngredients.length === 1 && <div className="text-4xl text-slate-200 animate-bounce">?</div>}
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mb-8">
+                {inventory.map(item => (
+                  <button
+                    key={item.id}
+                    disabled={item.count <= 0 || (alchemyIngredients.includes(item.id) && item.count === 1)}
+                    onClick={() => {
+                      if (alchemyIngredients.includes(item.id)) {
+                        setAlchemyIngredients(prev => prev.filter(i => i !== item.id));
+                      } else if (alchemyIngredients.length < 2) {
+                        setAlchemyIngredients(prev => [...prev, item.id]);
+                        playSound('pop');
+                      }
+                    }}
+                    className={cn(
+                      "p-4 rounded-[30px] border-4 transition-all flex items-center gap-4 group",
+                      alchemyIngredients.includes(item.id) 
+                        ? "bg-cute-purple/5 border-cute-purple shadow-lg" 
+                        : "bg-white border-slate-50 hover:border-cute-purple/30 shadow-sm"
+                    )}
+                  >
+                    <div className="text-3xl group-hover:scale-110 transition-transform">{item.icon}</div>
+                    <div className="flex flex-col items-start">
+                      <span className="font-black text-slate-700 text-sm leading-none mb-1">{item.name}</span>
+                      <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{item.count}개</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              <Button 
+                onClick={combineItems}
+                disabled={alchemyIngredients.length !== 2}
+                className="w-full py-8 text-xl font-black rounded-full bg-cute-purple hover:bg-cute-purple/90 text-white shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-30 disabled:hover:scale-100"
+              >
+                연금술 시작!! 🔮
+              </Button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Inventory Modal */}
+      <AnimatePresence>
+        {showInventory && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[900] bg-black/40 backdrop-blur-sm flex items-center justify-center p-6"
+            onClick={() => setShowInventory(false)}
+          >
+            <motion.div 
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="bg-white/95 backdrop-blur-xl h-full w-full max-w-md absolute right-0 p-8 shadow-2xl flex flex-col font-cute"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-3">
+                  <div className="bg-cute-blue p-2 rounded-2xl text-white">
+                    <Package size={24} />
+                  </div>
+                  <h2 className="text-2xl font-black text-slate-800">포근이의 가방 🐾</h2>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setShowInventory(false)} className="rounded-full">
+                  <X />
+                </Button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto pr-2 space-y-4">
+                {inventory.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
+                    <Package size={60} className="mb-4 text-slate-300" />
+                    <p className="font-bold text-lg">가방이 텅 비어있어용..<br/>포근이가 선물을 물어올 때까지 기다려용! ✨</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    {inventory.map((item) => (
+                      <motion.div 
+                        key={item.id}
+                        whileHover={{ scale: 1.05 }}
+                        className="bg-white border-4 border-slate-50 p-4 rounded-[30px] shadow-sm flex flex-col items-center gap-3 group relative"
+                      >
+                        <div className="text-4xl">{item.icon}</div>
+                        <span className="font-black text-slate-700">{item.name}</span>
+                        <div className="bg-slate-100 px-3 py-1 rounded-full text-xs font-black text-slate-400">
+                          {item.count}개 보유
+                        </div>
+                        <Button 
+                          onClick={() => useItem(item.id)}
+                          className="w-full mt-2 rounded-xl bg-cute-pink/10 hover:bg-cute-pink text-cute-pink hover:text-white transition-all text-sm font-black py-1 h-auto"
+                        >
+                          사용하기 ✨
+                        </Button>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              
+              <div className="mt-8 p-6 bg-slate-50 rounded-[30px] border-2 border-slate-100">
+                <h4 className="font-black text-slate-400 text-xs mb-3 uppercase tracking-widest">수집 팁! 🍭</h4>
+                <p className="text-sm font-bold text-slate-600 leading-relaxed">
+                  포근이를 쓰다듬으면 가끔 바닥에서 선물을 발견할 수 있어용!<br/>
+                  매일매일 출석해서 보물 상자도 열어보세용! ✨
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 
